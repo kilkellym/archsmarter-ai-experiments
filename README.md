@@ -11,7 +11,6 @@ These aren't theoretical demos. They're working tools built from actual project 
 | [StairLab](./stairlab/) | Parametric stair designer with IBC 2021 code checking | HTML tool |
 | [Parking Optimizer](./parking-optimizer/) | Maximizes stall count within a lot boundary | HTML tool, Claude Skill |
 | [Twisting Tower](./twisting-tower/) | Parametric tower form generator | HTML tool |
-| [Panel Configurator](./panel-configurator/) | Adaptive facade panel layout tool | HTML tool |
 | [Family Generator](./family-generator/) | Image/description to Revit family pipeline | Claude Skill, Launchpad script, example JSON |
 | [Floor Plan Generator](./floor-plan-generator/) | Sketch to Revit floor plan pipeline | Claude Skill, Launchpad script, example JSON |
 | [Detail View Generator](./detail-view-generator/) | Construction detail image to Revit drafting view | Claude Skill, Launchpad script, example JSON |
@@ -54,11 +53,11 @@ This means you can iterate on the design in Claude without touching C#, and the 
 
 ## About
 
-These experiments come from [ArchSmarter](https://archsmarter.com), where I write about technology and automation for architects. If you're interested in building tools like these:
+These experiments come from [ArchSmarter](https://www.archsmarter.com), where I write about technology and automation for architects. If you're interested in building tools like these:
 
-- **[Revit Add-in Academy](https://archsmarter.com/academy)** covers Revit API development and C# scripting
-- **[Claude Workflows for Architects](https://archsmarter.com/cwa)** covers using Claude for AEC workflows, including Skills and the Design Intent Pattern
-- **[Thursday Top 5 Newsletter](https://archsmarter.com/subscribe)** is a weekly roundup of AEC tech news and tips
+- **[Revit Add-in Academy](https://www.archsmarter.com/revit-add-in-academy)** covers Revit API development and C# scripting
+- **[Claude Workflows for Architects](https://archsmarter.com/claude-workflows-for-architects)** covers using Claude for AEC workflows, including Skills and the Design Intent Pattern
+- **[Thursday Top 5 Newsletter](https://www.archsmarter.com/newsletter)** is a weekly roundup of AEC tech news and tips
 
 ## License
 
