@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tower Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Anybody:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #0a0c0f;
+    --bg-panel: #12151a;
+    --bg-input: #1a1e25;
+    --bg-hover: #222830;
+    --border: #2a303a;
+    --border-focus: #9e8a3d;
+    --text-primary: #d4dae3;
+    --text-secondary: #737d8c;
+    --text-dim: #4a5260;
+    --accent: #f5c542;
+    --accent-dim: rgba(245, 197, 66, 0.15);
+    --accent-glow: rgba(245, 197, 66, 0.3);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100vh;
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .panel-header h1 {
+    font-family: 'Anybody', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .panel-header .subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  .panel-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 20px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .panel-scroll::-webkit-scrollbar { width: 4px; }
+  .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+  .panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .section { margin-bottom: 16px; }
+
+  /* Collapsible expander groups */
+  .expander { border: 1px solid var(--border); margin-bottom: 8px; background: var(--bg-panel); }
+  .expander-head {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; cursor: pointer; user-select: none;
+    padding: 11px 12px; background: var(--bg-input);
+    font-family: inherit; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary);
+    border: none; transition: color 0.15s, background 0.15s;
+  }
+  .expander-head:hover { color: var(--text-primary); }
+  .expander.open > .expander-head { color: var(--accent); }
+  .expander-chevron { font-size: 9px; transition: transform 0.2s; color: var(--text-dim); }
+  .expander.open .expander-chevron { transform: rotate(90deg); color: var(--accent); }
+  .expander-body { padding: 14px 12px 4px; display: none; }
+  .expander.open > .expander-body { display: block; }
+  .expander-body .section:last-child { margin-bottom: 4px; }
+
+  .section-label {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toggle-group { display: grid; gap: 6px; margin-bottom: 14px; }
+  .toggle-group.cols-2 { grid-template-columns: 1fr 1fr; }
+  .toggle-group.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .toggle-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 8px 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .toggle-btn:hover { border-color: var(--border-focus); color: var(--text-primary); }
+
+  .toggle-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Design-feature chips (multi-select, max 3) */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--border-focus); color: var(--text-primary); }
+  .chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .chip.maxed:not(.active) { opacity: 0.4; cursor: not-allowed; }
+  .chip.maxed:not(.active):hover { border-color: var(--border); color: var(--text-secondary); }
+  .chip-hint { font-size: 10px; color: var(--text-dim); margin-bottom: 14px; min-height: 12px; }
+
+  /* Strict adherence toggle */
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; margin-bottom: 6px;
+  }
+  .switch-row span { font-size: 11px; color: var(--text-secondary); }
+  .switch-track {
+    width: 34px; height: 18px; border-radius: 9px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    position: relative; transition: all 0.15s; flex-shrink: 0;
+  }
+  .switch-knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--text-dim); transition: all 0.15s;
+  }
+  .switch-row.on .switch-track { background: var(--accent-dim); border-color: var(--accent); }
+  .switch-row.on .switch-knob { left: 18px; background: var(--accent); }
+  .switch-help { font-size: 10px; color: var(--text-dim); margin-bottom: 14px; line-height: 1.4; }
+
+  .param-row { margin-bottom: 12px; }
+
+  .param-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
+  }
+
+  .param-label span:first-child { font-size: 11px; color: var(--text-secondary); }
+
+  .param-value {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 500;
+    min-width: 40px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--bg-input);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent-glow);
+    transition: box-shadow 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px var(--accent-glow); }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  .taper-select, .style-select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 8px 10px;
+    cursor: pointer;
+    outline: none;
+    margin-bottom: 12px;
+    transition: border-color 0.15s;
+  }
+
+  .taper-select:focus, .style-select:focus { border-color: var(--border-focus); }
+  .taper-select option, .style-select option { background: var(--bg-panel); }
+
+  .field-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 5px; }
+
+  /* --- COLOR SWATCHES --- */
+  .color-swatches { display: flex; gap: 8px; margin-bottom: 14px; }
+
+  .swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .swatch:hover { transform: scale(1.15); }
+
+  .swatch.active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+
+  .swatch.active::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 1px solid var(--text-dim);
+  }
+
+  /* --- GLASS OPACITY --- */
+  .glass-controls {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+    opacity: 0;
+  }
+
+  .glass-controls.visible { max-height: 60px; opacity: 1; }
+
+  /* --- PROMPT PREVIEW --- */
+  .prompt-preview {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 10px;
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    max-height: 100px;
+    overflow-y: auto;
+    margin-bottom: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .prompt-preview::-webkit-scrollbar { width: 3px; }
+  .prompt-preview::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* --- FOOTER --- */
+  .panel-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .footer-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .export-btn, .prompt-btn {
+    width: 100%;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 11px 0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .export-btn {
+    background: var(--accent);
+    color: var(--bg-deep);
+  }
+
+  .export-btn:hover { background: #f8d86b; box-shadow: 0 0 24px var(--accent-glow); }
+  .export-btn:active { transform: scale(0.98); }
+  .export-btn.exported { background: #6b5a1a; color: var(--accent); }
+
+  .prompt-btn {
+    background: var(--bg-input);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  .prompt-btn:hover {
+    background: var(--accent-dim);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+
+  .prompt-btn:active { transform: scale(0.98); }
+  .prompt-btn.copied { background: var(--accent-dim); border-color: var(--accent); color: var(--text-primary); }
+
+  /* --- VIEWPORT --- */
+  .viewport {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+
+  .viewport canvas { display: block; }
+
+  .viewport::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, var(--border) 0.5px, transparent 0.5px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .readout {
+    position: absolute;
+    bottom: 16px; left: 16px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .readout .val { color: var(--text-secondary); }
+
+  .orbit-hint {
+    position: absolute;
+    top: 16px; right: 16px;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 2s ease 4s;
+  }
+
+  .orbit-hint.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="panel">
+    <div class="panel-header">
+      <h1>Tower Generator</h1>
+      <div class="subtitle">Parametric massing configurator</div>
+    </div>
+
+    <div class="panel-scroll">
+
+      <!-- DISPLAY GROUP -->
+      <div class="expander" data-expander>
+        <button class="expander-head" type="button"><span>Display</span><span class="expander-chevron">&#9654;</span></button>
+        <div class="expander-body">
+
+      <!-- DISPLAY -->
+      <div class="section">
+        <div class="section-label">Display</div>
+        <div class="toggle-group cols-3" id="displayToggle">
+          <button class="toggle-btn active" data-display="wire">Wire</button>
+          <button class="toggle-btn" data-display="solid">Solid</button>
+          <button class="toggle-btn" data-display="glass">Glass</button>
+        </div>
+        <div class="glass-controls" id="glassControls">
+          <div class="param-row">
+            <div class="param-label">
+              <span>Glass Opacity</span>
+              <span class="param-value" id="val-opacity">35%</span>
+            </div>
+            <input type="range" id="glassOpacity" min="5" max="80" value="35" step="5">
+          </div>
+        </div>
+      </div>
+
+      <!-- COLOR -->
+      <div class="section">
+        <div class="section-label">Color</div>
+        <div class="color-swatches" id="colorSwatches">
+          <div class="swatch active" data-color="gold" style="background:#f5c542;" title="Gold"></div>
+          <div class="swatch" data-color="cyan" style="background:#2dd4bf;" title="Cyan"></div>
+          <div class="swatch" data-color="coral" style="background:#f0826d;" title="Coral"></div>
+          <div class="swatch" data-color="blue" style="background:#5b9cf5;" title="Blue"></div>
+          <div class="swatch" data-color="silver" style="background:#c8cdd5;" title="Silver"></div>
+          <div class="swatch" data-color="green" style="background:#59d990;" title="Green"></div>
+        </div>
+      </div>
+
+        </div>
+      </div>
+
+      <!-- FORM GROUP (open on load) -->
+      <div class="expander open" data-expander>
+        <button class="expander-head" type="button"><span>Form</span><span class="expander-chevron">&#9654;</span></button>
+        <div class="expander-body">
+
+      <!-- SHAPE -->
+      <div class="section">
+        <div class="section-label">Floor Shape</div>
+        <div class="toggle-group cols-3" id="shapeToggle">
+          <button class="toggle-btn active" data-shape="Rectangular">Rectangular</button>
+          <button class="toggle-btn" data-shape="Elliptical">Elliptical</button>
+          <button class="toggle-btn" data-shape="Triangular">Triangular</button>
+        </div>
+      </div>
+
+      <!-- DIMENSIONS -->
+      <div class="section">
+        <div class="section-label">Dimensions</div>
+        <div class="param-row">
+          <div class="param-label"><span>Floors</span><span class="param-value" id="val-floors">60</span></div>
+          <input type="range" id="numFloors" min="10" max="100" value="60" step="1">
+        </div>
+        <div class="param-row">
+          <div class="param-label"><span>Floor Height</span><span class="param-value" id="val-height">10 ft</span></div>
+          <input type="range" id="floorHeight" min="10" max="20" value="10" step="1">
+        </div>
+        <div class="param-row">
+          <div class="param-label"><span>Length</span><span class="param-value" id="val-length">40 ft</span></div>
+          <input type="range" id="length" min="20" max="100" value="40" step="1">
+        </div>
+        <div class="param-row">
+          <div class="param-label"><span>Width</span><span class="param-value" id="val-width">60 ft</span></div>
+          <input type="range" id="width" min="20" max="100" value="60" step="1">
+        </div>
+      </div>
+
+      <!-- TWIST -->
+      <div class="section">
+        <div class="section-label">Twist</div>
+        <div class="param-row">
+          <div class="param-label"><span>Angle per Floor</span><span class="param-value" id="val-twist">0&deg;</span></div>
+          <input type="range" id="twistAngle" min="0" max="30" value="0" step="0.5">
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="section">
+        <div class="section-label">Profile</div>
+        <select class="taper-select" id="taperProfile">
+          <option value="No Taper">No Taper</option>
+          <option value="Uniform Taper">Uniform Taper</option>
+          <option value="Stepped Taper">Stepped Taper</option>
+          <option value="Setback">Setback</option>
+          <option value="Spire">Spire</option>
+          <option value="Bulge Profile">Bulge Profile</option>
+          <option value="Hourglass Profile">Hourglass Profile</option>
+          <option value="Crown">Crown</option>
+          <option value="S-Curve">S-Curve</option>
+        </select>
+        <div class="param-row">
+          <div class="param-label"><span>Intensity</span><span class="param-value" id="val-taper">50%</span></div>
+          <input type="range" id="taperIntensity" min="0" max="100" value="50" step="5">
+        </div>
+      </div>
+
+        </div>
+      </div>
+
+      <!-- RENDER GROUP -->
+      <div class="expander" data-expander>
+        <button class="expander-head" type="button"><span>Render</span><span class="expander-chevron">&#9654;</span></button>
+        <div class="expander-body">
+
+      <!-- IMAGE PROMPT -->
+      <div class="section">
+        <div class="section-label">Image Prompt</div>
+
+        <div class="switch-row" id="adherenceToggle">
+          <span>Strict image adherence</span>
+          <div class="switch-track"><div class="switch-knob"></div></div>
+        </div>
+        <div class="switch-help">Prepends instructions telling Gemini to treat your attached screenshot as the exact geometry. Turn off if generating without an image.</div>
+
+        <div class="field-label">Render Medium</div>
+        <select class="style-select" id="renderMedium">
+          <option value="photorealistic">Photorealistic</option>
+          <option value="watercolor">Watercolor</option>
+          <option value="pencil_sketch">Pencil Sketch</option>
+          <option value="clay_render">Clay Render</option>
+          <option value="diagram">Massing Diagram</option>
+          <option value="comic">Comic Book</option>
+          <option value="minecraft">Minecraft</option>
+        </select>
+
+        <div class="field-label">Facade Material</div>
+        <select class="style-select" id="material">
+          <option value="glass_curtain_wall">Glass Curtain Wall</option>
+          <option value="concrete">Concrete</option>
+          <option value="brick">Brick</option>
+          <option value="wood_cladding">Wood Cladding</option>
+          <option value="metal_panel">Metal Panel</option>
+          <option value="stone">Stone</option>
+          <option value="stucco">Stucco</option>
+          <option value="corten_steel">Corten Steel</option>
+          <option value="terracotta">Terracotta</option>
+          <option value="composite">Composite</option>
+        </select>
+
+        <div class="field-label">Design Features <span style="color:var(--text-dim);">(up to 3)</span></div>
+        <div class="chip-group" id="designFeatureChips">
+          <button class="chip" type="button" data-feature="diagrid">Diagrid</button>
+          <button class="chip" type="button" data-feature="mega_bracing">Mega-Bracing</button>
+          <button class="chip" type="button" data-feature="sky_gardens">Sky Gardens</button>
+          <button class="chip" type="button" data-feature="wind_portal">Wind Portal</button>
+          <button class="chip" type="button" data-feature="crown">Crown / Spire</button>
+          <button class="chip" type="button" data-feature="sky_deck">Sky Deck</button>
+          <button class="chip" type="button" data-feature="podium">Podium</button>
+          <button class="chip" type="button" data-feature="sunshade_fins">Sunshade Fins</button>
+          <button class="chip" type="button" data-feature="pilotis">Pilotis</button>
+          <button class="chip" type="button" data-feature="faceted">Faceted Facade</button>
+        </div>
+        <div class="chip-hint" id="chipHint"></div>
+
+        <div class="field-label">Scene</div>
+        <select class="style-select" id="renderStyle">
+          <option value="golden_hour">Golden Hour</option>
+          <option value="midday">Bright Midday</option>
+          <option value="night">Night Drama</option>
+          <option value="misty">Misty Dawn</option>
+          <option value="studio">Studio Model</option>
+        </select>
+
+        <div class="field-label">Camera</div>
+        <select class="style-select" id="cameraAngle">
+          <option value="three_quarter" selected>Three-Quarter</option>
+          <option value="street">Street Level</option>
+          <option value="worms_eye">Worm's Eye</option>
+          <option value="aerial">Aerial / Bird's Eye</option>
+          <option value="elevation">Elevation</option>
+          <option value="axonometric">Axonometric</option>
+          <option value="current">Current View</option>
+        </select>
+
+        <div class="prompt-preview" id="promptPreview"></div>
+      </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel-footer">
+      <div class="footer-row">
+        <button class="export-btn" id="exportBtn">Export JSON</button>
+        <button class="prompt-btn" id="promptBtn">Prompt + Image</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <div class="readout" id="readout"></div>
+    <div class="orbit-hint" id="orbitHint">drag to orbit &middot; scroll to zoom</div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  COLOR PALETTE
+// ============================================================
+const PALETTES = {
+  gold:   { hex: 0xf5c542, css: '#f5c542', dim: 0x7a6221, dimCss: '#7a6221', specular: 0x332200, glowCss: 'rgba(245,197,66,0.3)',  dimCss2: 'rgba(245,197,66,0.15)', focusCss: '#9e8a3d' },
+  cyan:   { hex: 0x2dd4bf, css: '#2dd4bf', dim: 0x1a7a6e, dimCss: '#1a7a6e', specular: 0x003322, glowCss: 'rgba(45,212,191,0.3)',  dimCss2: 'rgba(45,212,191,0.15)', focusCss: '#3d8e9e' },
+  coral:  { hex: 0xf0826d, css: '#f0826d', dim: 0x7a4137, dimCss: '#7a4137', specular: 0x331100, glowCss: 'rgba(240,130,109,0.3)', dimCss2: 'rgba(240,130,109,0.15)', focusCss: '#9e5a3d' },
+  blue:   { hex: 0x5b9cf5, css: '#5b9cf5', dim: 0x2d4e7a, dimCss: '#2d4e7a', specular: 0x001133, glowCss: 'rgba(91,156,245,0.3)', dimCss2: 'rgba(91,156,245,0.15)', focusCss: '#3d6a9e' },
+  silver: { hex: 0xc8cdd5, css: '#c8cdd5', dim: 0x64676b, dimCss: '#64676b', specular: 0x222222, glowCss: 'rgba(200,205,213,0.3)', dimCss2: 'rgba(200,205,213,0.15)', focusCss: '#7a7d82' },
+  green:  { hex: 0x59d990, css: '#59d990', dim: 0x2d6d48, dimCss: '#2d6d48', specular: 0x003311, glowCss: 'rgba(89,217,144,0.3)', dimCss2: 'rgba(89,217,144,0.15)', focusCss: '#3d9e5a' },
+};
+
+// ============================================================
+//  STATE
+// ============================================================
+const state = {
+  displayMode: 'wire',
+  glassOpacity: 35,
+  colorKey: 'gold',
+  floorShape: 'Rectangular',
+  numFloors: 60,
+  floorHeight: 10,
+  length: 40,
+  width: 60,
+  twistAngle: 0,
+  taperProfile: 'No Taper',
+  taperIntensity: 50,
+  renderStyle: 'golden_hour',
+  material: 'glass_curtain_wall',
+  renderMedium: 'photorealistic',
+  designFeatures: [],
+  strictAdherence: true,
+  cameraAngle: 'three_quarter'
+};
+
+function pal() { return PALETTES[state.colorKey]; }
+
+// ============================================================
+//  TAPER MATH
+// ============================================================
+function calculateScaleFactor(floorIndex, totalFloors, profile, intensityPct) {
+  const intensity = intensityPct / 100;
+  const position = floorIndex / Math.max(1, totalFloors);
+
+  switch (profile) {
+    case 'No Taper':
+      return 1.0;
+    case 'Uniform Taper':
+      return 1.0 - (position * intensity);
+    case 'Stepped Taper': {
+      const steps = 4;
+      const step = Math.floor(position * steps);
+      return 1.0 - (step * (intensity / steps));
+    }
+    case 'Setback': {
+      if (position < 0.5) return 1.0;
+      if (position < 0.8) return 1.0 - intensity * 0.4;
+      return 1.0 - intensity * 0.7;
+    }
+    case 'Spire': {
+      return 1.0 - intensity * Math.pow(position, 2.5);
+    }
+    case 'Bulge Profile': {
+      const bp = 2.0 * Math.abs(position - 0.5);
+      return 1.0 + (intensity / 2) - (bp * intensity / 2);
+    }
+    case 'Hourglass Profile': {
+      const hp = 2.0 * Math.abs(position - 0.5);
+      return 1.0 - (intensity / 2) + (hp * intensity / 2);
+    }
+    case 'Crown': {
+      if (position < 0.6) return 1.0 - (position / 0.6) * intensity * 0.4;
+      const flare = (position - 0.6) / 0.4;
+      return (1.0 - intensity * 0.4) + flare * intensity * 0.5;
+    }
+    case 'S-Curve': {
+      return 1.0 + intensity * 0.25 * Math.sin(position * Math.PI * 3);
+    }
+    default:
+      return 1.0;
+  }
+}
+
+// ============================================================
+//  PROMPT GENERATOR
+// ============================================================
+const PROFILE_DESCRIPTIONS = {
+  'No Taper':           'with uniform floor plates of consistent size from base to top',
+  'Uniform Taper':      'with a linear taper that gradually narrows from base to top',
+  'Stepped Taper':      'with a stepped taper that narrows in four discrete stages',
+  'Setback':            'with classic setback massing featuring three distinct tiers stepping inward, reminiscent of early 20th century New York zoning',
+  'Spire':              'with a spire profile that tapers dramatically toward the top, gently at the base and accelerating upward',
+  'Bulge Profile':      'with a bulging midsection that swells wider at the middle floors before tapering back at the top and bottom',
+  'Hourglass Profile':  'with an hourglass silhouette that pinches inward at the middle floors and widens at the top and base',
+  'Crown':              'with a crown profile that narrows through the midsection then flares outward at the top, forming a distinctive canopy',
+  'S-Curve':            'with an undulating S-curve profile that sinuously varies in width along its height',
+};
+
+const STYLE_SUFFIXES = {
+  golden_hour:  'Golden hour warm sunset lighting casting long dramatic shadows. Dense urban context with neighboring buildings visible.',
+  midday:       'Bright midday sunlight with crisp, short shadows and a clear blue sky. Set in a dense urban skyline with city blocks and streets visible.',
+  night:        'Nighttime scene with the tower lit from within, each floor plate glowing softly against a dramatic blue-black sky. City lights in the background and subtle fog at the base. Cinematic lighting, high contrast.',
+  misty:        'Early morning with low-hanging fog wrapping the lower third of the tower. Soft diffused light and muted tones, the upper floors emerging above the mist into pale golden light. Atmospheric and ethereal.',
+  studio:       'Clean light gray studio background with a soft gradient. The tower presented as a centered scale model with even studio lighting and soft shadows. No surrounding context.',
+};
+
+// Camera is an independent axis: viewpoint only, no lighting or context.
+const CAMERA_DESCRIPTIONS = {
+  street:        'Street-level eye-height perspective, roughly 5 feet above ground, viewing the tower from across a plaza or boulevard.',
+  three_quarter: 'Three-quarter perspective from about 45 degrees above, clearly reading the massing, the twist, and the roof.',
+  aerial:        'High aerial bird\'s eye view looking down at the tower and its site, emphasizing the footprint and surrounding context.',
+  worms_eye:     'Extreme low-angle worm\'s eye view looking straight up from the base, dramatic converging verticals emphasizing the twist and vertical scale.',
+  elevation:     'Straight-on architectural elevation view at eye level, viewing one full face of the tower head-on with no vertical tilt, clearly showing the silhouette and profile.',
+  axonometric:   'Axonometric three-quarter view from above with minimal perspective distortion, an analytical viewpoint showing the form objectively.',
+  current:       'Three-quarter perspective clearly reading the massing, the twist, and the roof.',
+};
+
+// Render medium leads the prompt and owns the rendering style statement.
+const MEDIUM_DESCRIPTIONS = {
+  photorealistic: 'Photorealistic architectural rendering. Physically accurate materials and lighting, high detail, 8K resolution.',
+  watercolor:     'Architectural watercolor rendering with loose, expressive brushstrokes. Soft color bleeds and white paper showing through. Hand-painted quality.',
+  pencil_sketch:  'Detailed architectural pencil sketch on white paper. Fine line work with hatching for shadows. Hand-drawn quality with construction lines faintly visible.',
+  clay_render:    'Clean white clay render with no textures, only form and shadow. Soft ambient occlusion highlighting the massing and spatial relationships.',
+  diagram:        'Architectural massing diagram with clean flat colors, thin outlines, and labeled dimensions. Axonometric projection. Minimal, analytical style.',
+  comic:          'Comic book style architectural illustration with bold black ink outlines, flat cel-shaded colors, halftone dot shading for shadows, and dramatic perspective. Strong contrast, visible linework. Graphic novel aesthetic.',
+  minecraft:      'Rendered in the blocky voxel style of Minecraft, the entire tower reconstructed from cubic blocks with low-resolution pixelated textures, a visible voxel grid, flat cubic lighting, and a bright blocky sky. Playful game-world aesthetic.',
+};
+
+// Facade material affects the prompt text only, not the 3D viewport. Phrased to follow "clad in".
+const MATERIAL_DESCRIPTIONS = {
+  glass_curtain_wall: 'a reflective glass curtain wall facade with visible mullions',
+  concrete:           'exposed raw concrete with board-formed texture and visible joints',
+  brick:              'traditional brick masonry with a running bond pattern',
+  wood_cladding:      'warm natural wood cladding with vertical grain',
+  metal_panel:        'sleek metal cladding panels with a brushed finish',
+  stone:              'natural cut stone cladding with subtle veining',
+  stucco:             'smooth white stucco with clean modern detailing',
+  corten_steel:       'weathering Corten steel with a rich rust-orange patina',
+  terracotta:         'terracotta facade panels with warm earth tones',
+  composite:          'a mixed-material facade combining glass, metal, and concrete elements',
+};
+
+// Single design feature layered onto the massing description.
+const FEATURE_DESCRIPTIONS = {
+  diagrid:       'a structural diagrid exoskeleton wrapping the facade, its diagonal members following the twist of the form',
+  mega_bracing:  'bold expressed mega-bracing forming large X-braces across the facade as a visible structural statement',
+  sky_gardens:   'planted sky gardens and landscaped setback terraces carved into the massing at intervals up the tower',
+  wind_portal:   'a large through-building wind portal cut through the upper mass, a sculptural void framing the sky beyond',
+  crown:         'an illuminated sculptural crown and spire capping the top of the tower',
+  sky_deck:      'a cantilevered rooftop sky deck projecting from the crown of the tower',
+  podium:        'a sculptural cantilevered entry canopy and retail podium anchoring the tower at street level',
+  sunshade_fins: 'vertical sunshade fins running the full height of the facade, casting rhythmic shadow lines',
+  pilotis:       'the tower lifted on pilotis above an open elevated public plaza at its base',
+  faceted:       'a faceted, crystalline facade of angular planes that catch and fracture the light',
+};
+
+// Prepended when "Strict image adherence" is on. Scopes the image's authority to geometry only,
+// leaving material, lighting, and camera to the text. Written for fresh text-to-image with an attachment.
+const ADHERENCE_PREAMBLE = 'Render the exact building shown in the attached image. The attached image is the ground truth for the geometry: reproduce its silhouette, proportions, number of floors, floor-by-floor twist, and footprint shape precisely. Do not straighten the twist, change the floor count, alter the footprint, or restyle the overall form. Apply only the material, lighting, and viewpoint described below as surface and atmosphere on that exact massing.';
+
+function generatePrompt() {
+  const { floorShape, numFloors, floorHeight, length, width, twistAngle, taperProfile, taperIntensity, renderStyle, material, renderMedium, designFeatures, strictAdherence, cameraAngle } = state;
+
+  const totalHeight = (numFloors - 1) * floorHeight;
+  const totalTwist = (numFloors - 1) * twistAngle;
+  const approxStories = numFloors;
+  const footprint = floorShape === 'Elliptical' ? 'an elliptical' : floorShape === 'Triangular' ? 'a triangular' : 'a rectangular';
+  const dims = `${length}-foot by ${width}-foot`;
+
+  // Strict adherence preamble leads when enabled (image-attached workflow)
+  let desc = strictAdherence ? ADHERENCE_PREAMBLE + ' ' : '';
+
+  // Render medium
+  desc += MEDIUM_DESCRIPTIONS[renderMedium] + ' ';
+
+  // Base description
+  desc += `A ${approxStories}-story high-rise tower with ${footprint} ${dims} floor plan, approximately ${totalHeight} feet tall.`;
+
+  // Profile
+  const profileDesc = PROFILE_DESCRIPTIONS[taperProfile] || '';
+  if (taperProfile !== 'No Taper' && taperIntensity > 0) {
+    desc += ` The tower ${profileDesc} at ${taperIntensity}% intensity.`;
+  } else {
+    desc += ` The tower has a straight, untapered form with identical floor plates at every level.`;
+  }
+
+  // Twist
+  if (twistAngle > 0) {
+    desc += ` Each floor is rotated ${twistAngle} degrees from the one below it, creating a total twist of ${totalTwist.toFixed(1)} degrees from base to top.`;
+  }
+
+  // Facade material
+  desc += ` The facade is clad in ${MATERIAL_DESCRIPTIONS[material]}.`;
+
+  // Design features (up to 3, joined naturally)
+  const featPhrases = designFeatures.map(f => FEATURE_DESCRIPTIONS[f]).filter(Boolean);
+  if (featPhrases.length === 1) {
+    desc += ` The design incorporates ${featPhrases[0]}.`;
+  } else if (featPhrases.length === 2) {
+    desc += ` The design incorporates ${featPhrases[0]} and ${featPhrases[1]}.`;
+  } else if (featPhrases.length >= 3) {
+    desc += ` The design incorporates ${featPhrases[0]}, ${featPhrases[1]}, and ${featPhrases[2]}.`;
+  }
+
+  // Scene suffix (lighting, context)
+  desc += ' ' + STYLE_SUFFIXES[renderStyle];
+
+  // Camera viewpoint (independent axis, last). Current View defers to the attached image.
+  if (cameraAngle !== 'current') {
+    desc += ' ' + CAMERA_DESCRIPTIONS[cameraAngle];
+  }
+
+  return desc;
+}
+
+function updatePromptPreview() {
+  document.getElementById('promptPreview').textContent = generatePrompt();
+}
+
+// ============================================================
+//  THREE.JS SETUP
+// ============================================================
+const viewport = document.getElementById('viewport');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x0a0c0f, 1);
+viewport.appendChild(renderer.domElement);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambientLight);
+const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
+dirLight1.position.set(200, 500, 300);
+scene.add(dirLight1);
+const dirLight2 = new THREE.DirectionalLight(0x8899bb, 0.35);
+dirLight2.position.set(-300, 200, -200);
+scene.add(dirLight2);
+
+const orbit = {
+  theta: 0.6, phi: 0.8, radius: 600,
+  target: new THREE.Vector3(0, 200, 0),
+  dragging: false, lastX: 0, lastY: 0
+};
+
+function updateCamera() {
+  const sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
+  const st = Math.sin(orbit.theta), ct = Math.cos(orbit.theta);
+  camera.position.set(
+    orbit.target.x + orbit.radius * sp * st,
+    orbit.target.y + orbit.radius * cp,
+    orbit.target.z + orbit.radius * sp * ct
+  );
+  camera.lookAt(orbit.target);
+}
+
+// ----- View presets (Design B) -----
+// theta = azimuth, phi = polar from +Y (small = looking down, ~PI/2 = level, large = looking up).
+// radiusFactor multiplies the tower's governing dimension so framing scales with size.
+const VIEW_PRESETS = {
+  three_quarter: { theta: 0.7,  phi: 1.05, radiusFactor: 1.5  },
+  street:        { theta: 0.7,  phi: 2.55, radiusFactor: 1.7  },
+  worms_eye:     { theta: 0.7,  phi: 2.95, radiusFactor: 1.2  },
+  aerial:        { theta: 0.7,  phi: 0.35, radiusFactor: 1.9  },
+  elevation:     { theta: 0.0,  phi: 1.5708, radiusFactor: 1.6 },
+  axonometric:   { theta: 0.785, phi: 0.62, radiusFactor: 2.2 },
+};
+
+function presetRadius(rf) {
+  const totalH = (state.numFloors - 1) * state.floorHeight;
+  const maxDim = Math.max(state.length, state.width, totalH);
+  return maxDim * rf;
+}
+
+// Snap the orbit instantly to a preset (used at capture time so the screenshot matches the prompt).
+function applyViewPreset(key) {
+  const p = VIEW_PRESETS[key];
+  if (!p) return; // 'current' or unknown: leave orbit as-is
+  orbit.theta = p.theta;
+  orbit.phi = p.phi;
+  orbit.radius = presetRadius(p.radiusFactor);
+}
+
+// Smoothly animate the orbit to a preset (used when the user picks a view).
+let viewAnim = null;
+function animateViewPreset(key) {
+  const p = VIEW_PRESETS[key];
+  if (!p) return;
+  const targetRadius = presetRadius(p.radiusFactor);
+  // Choose the shortest way around for theta so it never spins the long way.
+  let dTheta = p.theta - orbit.theta;
+  while (dTheta > Math.PI) dTheta -= Math.PI * 2;
+  while (dTheta < -Math.PI) dTheta += Math.PI * 2;
+  viewAnim = {
+    fromTheta: orbit.theta, dTheta,
+    fromPhi: orbit.phi, toPhi: p.phi,
+    fromRadius: orbit.radius, toRadius: targetRadius,
+    start: performance.now(), dur: 550
+  };
+}
+
+function tickViewAnim() {
+  if (!viewAnim) return;
+  const t = Math.min(1, (performance.now() - viewAnim.start) / viewAnim.dur);
+  const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; // easeInOutQuad
+  orbit.theta = viewAnim.fromTheta + viewAnim.dTheta * e;
+  orbit.phi = viewAnim.fromPhi + (viewAnim.toPhi - viewAnim.fromPhi) * e;
+  orbit.radius = viewAnim.fromRadius + (viewAnim.toRadius - viewAnim.fromRadius) * e;
+  if (t >= 1) viewAnim = null;
+}
+
+viewport.addEventListener('pointerdown', e => {
+  orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+  viewAnim = null;
+  document.getElementById('orbitHint').classList.add('hidden');
+});
+window.addEventListener('pointerup', () => { orbit.dragging = false; });
+window.addEventListener('pointermove', e => {
+  if (!orbit.dragging) return;
+  orbit.theta -= (e.clientX - orbit.lastX) * 0.005;
+  orbit.phi = Math.max(0.05, Math.min(Math.PI - 0.05, orbit.phi - (e.clientY - orbit.lastY) * 0.005));
+  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+});
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  viewAnim = null;
+  orbit.radius = Math.max(50, Math.min(3000, orbit.radius + e.deltaY * 0.5));
+}, { passive: false });
+
+// ============================================================
+//  FLOOR OUTLINE BUILDERS
+// ============================================================
+const ELLIPSE_SEGMENTS = 48;
+
+function buildRectanglePoints(halfL, halfW, rotRad) {
+  const pts = [[-halfL,-halfW],[halfL,-halfW],[halfL,halfW],[-halfL,halfW]];
+  const c = Math.cos(rotRad), s = Math.sin(rotRad);
+  return pts.map(([x,y]) => [x*c - y*s, x*s + y*c]);
+}
+
+function buildEllipsePoints(halfL, halfW, rotRad) {
+  const pts = [];
+  const c = Math.cos(rotRad), s = Math.sin(rotRad);
+  for (let i = 0; i < ELLIPSE_SEGMENTS; i++) {
+    const a = (i / ELLIPSE_SEGMENTS) * Math.PI * 2;
+    const x = halfL * Math.cos(a), y = halfW * Math.sin(a);
+    pts.push([x*c - y*s, x*s + y*c]);
+  }
+  return pts;
+}
+
+function buildTrianglePoints(halfL, halfW, rotRad) {
+  // Fills the bounding box. Apex along +Z (width axis), base on the -Z edge.
+  const pts = [[0, halfW], [-halfL, -halfW], [halfL, -halfW]];
+  const c = Math.cos(rotRad), s = Math.sin(rotRad);
+  return pts.map(([x,y]) => [x*c - y*s, x*s + y*c]);
+}
+
+// ============================================================
+//  MESH BUILDERS
+// ============================================================
+function buildFloorPlateMesh(pts2d, elevation, material) {
+  const n = pts2d.length;
+  let cx = 0, cy = 0;
+  for (const [x, z] of pts2d) { cx += x; cy += z; }
+  cx /= n; cy /= n;
+  const verts = [], norms = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    verts.push(cx, elevation, cy, pts2d[i][0], elevation, pts2d[i][1], pts2d[j][0], elevation, pts2d[j][1]);
+    norms.push(0,1,0, 0,1,0, 0,1,0);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
+  return new THREE.Mesh(geo, material);
+}
+
+function buildSkinPanels(ptsA, elevA, ptsB, elevB, material) {
+  const n = ptsA.length;
+  if (ptsB.length !== n) return null;
+  const verts = [], norms = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a0 = [ptsA[i][0], elevA, ptsA[i][1]], a1 = [ptsA[j][0], elevA, ptsA[j][1]];
+    const b0 = [ptsB[i][0], elevB, ptsB[i][1]], b1 = [ptsB[j][0], elevB, ptsB[j][1]];
+    const ux = b0[0]-a0[0], uy = b0[1]-a0[1], uz = b0[2]-a0[2];
+    const vx = b1[0]-a0[0], vy = b1[1]-a0[1], vz = b1[2]-a0[2];
+    let nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
+    const len = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    verts.push(...a0, ...b0, ...b1, ...a0, ...b1, ...a1);
+    norms.push(nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
+  return new THREE.Mesh(geo, material);
+}
+
+// ============================================================
+//  DYNAMIC MATERIALS
+// ============================================================
+function makeWireMat()    { return new THREE.LineBasicMaterial({ color: pal().hex, transparent: true, opacity: 0.7 }); }
+function makeWireMatDim() { return new THREE.LineBasicMaterial({ color: pal().dim, transparent: true, opacity: 0.25 }); }
+function makeVertMat()    { return new THREE.LineBasicMaterial({ color: pal().hex, transparent: true, opacity: 0.15 }); }
+
+function makeSolidFloorMat() {
+  return new THREE.MeshPhongMaterial({ color: pal().hex, specular: pal().specular, shininess: 20, flatShading: true, side: THREE.DoubleSide });
+}
+function makeSolidSkinMat() {
+  const c = new THREE.Color(pal().hex).multiplyScalar(0.82);
+  return new THREE.MeshPhongMaterial({ color: c, specular: pal().specular, shininess: 15, flatShading: true, side: THREE.DoubleSide });
+}
+
+function makeGlassFloorMat() {
+  const op = state.glassOpacity / 100;
+  return new THREE.MeshPhongMaterial({ color: pal().hex, specular: pal().specular, shininess: 40, transparent: true, opacity: op * 0.6, flatShading: true, side: THREE.DoubleSide, depthWrite: false });
+}
+function makeGlassSkinMat() {
+  const op = state.glassOpacity / 100;
+  return new THREE.MeshPhongMaterial({ color: pal().hex, specular: pal().specular, shininess: 30, transparent: true, opacity: op * 0.25, flatShading: true, side: THREE.DoubleSide, depthWrite: false });
+}
+function makeGlassEdgeMat() {
+  const op = state.glassOpacity / 100;
+  return new THREE.LineBasicMaterial({ color: pal().hex, transparent: true, opacity: Math.min(0.6, op * 0.9) });
+}
+function makeSolidEdgeMat() {
+  return new THREE.LineBasicMaterial({ color: pal().hex, transparent: true, opacity: 0.15 });
+}
+
+// ============================================================
+//  SCENE REBUILD
+// ============================================================
+const towerGroup = new THREE.Group();
+scene.add(towerGroup);
+const gridHelper = new THREE.GridHelper(400, 20, 0x1a1e25, 0x1a1e25);
+scene.add(gridHelper);
+
+function disposeTower() {
+  while (towerGroup.children.length) {
+    const child = towerGroup.children[0];
+    if (child.geometry) child.geometry.dispose();
+    if (child.material && child.material.dispose) child.material.dispose();
+    towerGroup.remove(child);
+  }
+}
+
+function rebuildTower() {
+  disposeTower();
+  const { displayMode, floorShape, numFloors, floorHeight, length, width, twistAngle, taperProfile, taperIntensity } = state;
+  const baseHalfL = length / 2, baseHalfW = width / 2;
+  const totalFloors = numFloors - 1;
+
+  const floors = [];
+  for (let i = 0; i < numFloors; i++) {
+    const elevation = i * floorHeight;
+    const rotation = i * twistAngle * (Math.PI / 180);
+    const scale = calculateScaleFactor(i, totalFloors, taperProfile, taperIntensity);
+    const pts2d = floorShape === 'Rectangular'
+      ? buildRectanglePoints(baseHalfL * scale, baseHalfW * scale, rotation)
+      : floorShape === 'Triangular'
+      ? buildTrianglePoints(baseHalfL * scale, baseHalfW * scale, rotation)
+      : buildEllipsePoints(baseHalfL * scale, baseHalfW * scale, rotation);
+    floors.push({ pts2d, elevation });
+  }
+
+  if (displayMode === 'wire') buildWireMode(floors);
+  else if (displayMode === 'solid') buildMeshMode(floors, makeSolidFloorMat(), makeSolidSkinMat(), makeSolidEdgeMat());
+  else buildMeshMode(floors, makeGlassFloorMat(), makeGlassSkinMat(), makeGlassEdgeMat());
+
+  orbit.target.y = (totalFloors * floorHeight) / 2;
+  const maxDim = Math.max(length, width, totalFloors * floorHeight);
+  if (orbit.radius < maxDim * 0.8) orbit.radius = maxDim * 0.8;
+  updateReadout();
+  updatePromptPreview();
+}
+
+function buildWireMode(floors) {
+  const n = floors.length;
+  const wm = makeWireMat(), wd = makeWireMatDim(), vm = makeVertMat();
+  for (let i = 0; i < n; i++) {
+    const { pts2d, elevation } = floors[i];
+    const pts3d = pts2d.map(([x,z]) => new THREE.Vector3(x, elevation, z));
+    pts3d.push(pts3d[0].clone());
+    towerGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts3d), (i === 0 || i === n-1 || i % 5 === 0) ? wm : wd));
+  }
+  const cc = state.floorShape === 'Rectangular' ? 4 : state.floorShape === 'Triangular' ? 3 : 8;
+  for (let c = 0; c < cc; c++) {
+    const verts = [];
+    for (let i = 0; i < n; i++) {
+      const { pts2d, elevation } = floors[i];
+      const idx = Math.floor((c / cc) * pts2d.length);
+      verts.push(new THREE.Vector3(pts2d[idx][0], elevation, pts2d[idx][1]));
+    }
+    towerGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(verts), vm));
+  }
+}
+
+function buildMeshMode(floors, floorMat, skinMat, edgeMat) {
+  const n = floors.length;
+  for (let i = 0; i < n; i++) {
+    const { pts2d, elevation } = floors[i];
+    towerGroup.add(buildFloorPlateMesh(pts2d, elevation, floorMat));
+    if (edgeMat && (i % 10 === 0 || i === 0 || i === n-1)) {
+      const pts3d = pts2d.map(([x,z]) => new THREE.Vector3(x, elevation, z));
+      pts3d.push(pts3d[0].clone());
+      towerGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts3d), edgeMat));
+    }
+    if (i < n - 1) {
+      const skin = buildSkinPanels(pts2d, elevation, floors[i+1].pts2d, floors[i+1].elevation, skinMat);
+      if (skin) towerGroup.add(skin);
+    }
+  }
+}
+
+// ============================================================
+//  READOUT
+// ============================================================
+function updateReadout() {
+  const totalH = (state.numFloors - 1) * state.floorHeight;
+  const totalTwist = (state.numFloors - 1) * state.twistAngle;
+  const baseArea = state.floorShape === 'Elliptical'
+    ? (Math.PI * (state.length/2) * (state.width/2)).toFixed(0)
+    : state.floorShape === 'Triangular'
+    ? ((state.length * state.width) / 2).toFixed(0)
+    : (state.length * state.width);
+  document.getElementById('readout').innerHTML =
+    `Total height  <span class="val">${totalH} ft</span><br>` +
+    `Total twist   <span class="val">${totalTwist.toFixed(1)}&deg;</span><br>` +
+    `Floor area    <span class="val">${baseArea} sf (base)</span>`;
+}
+
+// ============================================================
+//  CSS THEME
+// ============================================================
+function applyCssTheme() {
+  const p = pal();
+  const root = document.documentElement.style;
+  root.setProperty('--accent', p.css);
+  root.setProperty('--accent-dim', p.dimCss2);
+  root.setProperty('--accent-glow', p.glowCss);
+  root.setProperty('--border-focus', p.focusCss);
+}
+
+// ============================================================
+//  UI BINDINGS
+// ============================================================
+
+// Display mode
+document.querySelectorAll('#displayToggle .toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#displayToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.displayMode = btn.dataset.display;
+    document.getElementById('glassControls').classList.toggle('visible', state.displayMode === 'glass');
+    rebuildTower();
+  });
+});
+
+// Glass opacity
+document.getElementById('glassOpacity').addEventListener('input', e => {
+  state.glassOpacity = parseFloat(e.target.value);
+  document.getElementById('val-opacity').textContent = state.glassOpacity + '%';
+  rebuildTower();
+});
+
+// Color swatches
+document.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    state.colorKey = sw.dataset.color;
+    applyCssTheme();
+    rebuildTower();
+  });
+});
+
+// Shape toggle
+document.querySelectorAll('#shapeToggle .toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#shapeToggle .toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.floorShape = btn.dataset.shape;
+    rebuildTower();
+  });
+});
+
+// Sliders
+const sliders = [
+  { id: 'numFloors',      key: 'numFloors',      valId: 'val-floors', fmt: v => v },
+  { id: 'floorHeight',    key: 'floorHeight',    valId: 'val-height', fmt: v => v + ' ft' },
+  { id: 'length',         key: 'length',         valId: 'val-length', fmt: v => v + ' ft' },
+  { id: 'width',          key: 'width',          valId: 'val-width',  fmt: v => v + ' ft' },
+  { id: 'twistAngle',     key: 'twistAngle',     valId: 'val-twist',  fmt: v => v + '\u00B0' },
+  { id: 'taperIntensity', key: 'taperIntensity', valId: 'val-taper',  fmt: v => v + '%' },
+];
+
+sliders.forEach(({ id, key, valId, fmt }) => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    state[key] = v;
+    document.getElementById(valId).textContent = fmt(v);
+    rebuildTower();
+  });
+});
+
+// Taper dropdown
+document.getElementById('taperProfile').addEventListener('change', e => {
+  state.taperProfile = e.target.value;
+  rebuildTower();
+});
+
+// Expander groups (independent toggles)
+document.querySelectorAll('[data-expander] > .expander-head').forEach(head => {
+  head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
+});
+
+// Prompt dropdowns (scene, medium, material)
+[
+  { id: 'renderStyle',   key: 'renderStyle' },
+  { id: 'renderMedium',  key: 'renderMedium' },
+  { id: 'material',      key: 'material' },
+].forEach(({ id, key }) => {
+  document.getElementById(id).addEventListener('change', e => {
+    state[key] = e.target.value;
+    updatePromptPreview();
+  });
+});
+
+// Design feature chips (multi-select, max 3, block at cap)
+const MAX_FEATURES = 3;
+const chipGroup = document.getElementById('designFeatureChips');
+const chipHint = document.getElementById('chipHint');
+function refreshChips() {
+  const maxed = state.designFeatures.length >= MAX_FEATURES;
+  chipGroup.querySelectorAll('.chip').forEach(chip => {
+    const active = state.designFeatures.includes(chip.dataset.feature);
+    chip.classList.toggle('active', active);
+    chip.classList.toggle('maxed', maxed);
+  });
+  chipHint.textContent = maxed ? 'Maximum of 3 features selected.' : '';
+}
+chipGroup.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const f = chip.dataset.feature;
+    const i = state.designFeatures.indexOf(f);
+    if (i >= 0) {
+      state.designFeatures.splice(i, 1);            // toggle off
+    } else if (state.designFeatures.length < MAX_FEATURES) {
+      state.designFeatures.push(f);                 // add if under cap
+    } else {
+      return;                                       // blocked at cap
+    }
+    refreshChips();
+    updatePromptPreview();
+  });
+});
+refreshChips();
+
+// Strict image adherence toggle
+const adherenceToggle = document.getElementById('adherenceToggle');
+adherenceToggle.classList.toggle('on', state.strictAdherence);
+adherenceToggle.addEventListener('click', () => {
+  state.strictAdherence = !state.strictAdherence;
+  adherenceToggle.classList.toggle('on', state.strictAdherence);
+  updatePromptPreview();
+});
+
+// Camera dropdown drives both the prompt and the viewport (Design B).
+// Picking a preset animates the camera there; Current View leaves the orbit as-is.
+document.getElementById('cameraAngle').addEventListener('change', e => {
+  state.cameraAngle = e.target.value;
+  if (state.cameraAngle !== 'current') animateViewPreset(state.cameraAngle);
+  updatePromptPreview();
+});
+
+// ============================================================
+//  JSON EXPORT
+// ============================================================
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const payload = {
+    floorShape: state.floorShape,
+    numFloors: state.numFloors,
+    floorHeight: state.floorHeight,
+    length: state.length,
+    width: state.width,
+    twistAngle: state.twistAngle,
+    taperProfile: state.taperProfile,
+    taperIntensity: state.taperIntensity
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'tower_config.json'; a.click();
+  URL.revokeObjectURL(url);
+  const btn = document.getElementById('exportBtn');
+  btn.textContent = 'Exported'; btn.classList.add('exported');
+  setTimeout(() => { btn.textContent = 'Export JSON'; btn.classList.remove('exported'); }, 1800);
+});
+
+// ============================================================
+//  PROMPT COPY
+// ============================================================
+document.getElementById('promptBtn').addEventListener('click', () => {
+  const text = generatePrompt();
+  const btn = document.getElementById('promptBtn');
+
+  // Design B guarantee: snap to the selected preset so the screenshot matches the prompt,
+  // even if the user orbited away. Current View captures wherever the camera is.
+  viewAnim = null;
+  if (state.cameraAngle !== 'current') applyViewPreset(state.cameraAngle);
+  updateCamera();
+
+  // Force a clean render before capture
+  renderer.render(scene, camera);
+
+  // Capture viewport screenshot as PNG via blob for reliable download
+  renderer.domElement.toBlob(function(blob) {
+    const url = URL.createObjectURL(blob);
+    const dlLink = document.createElement('a');
+    dlLink.href = url;
+    dlLink.download = 'tower_screenshot.png';
+    dlLink.style.display = 'none';
+    document.body.appendChild(dlLink);
+    dlLink.click();
+    document.body.removeChild(dlLink);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }, 'image/png');
+
+  // Copy prompt text to clipboard
+  function showConfirm() {
+    btn.textContent = 'Saved + Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Prompt + Image'; btn.classList.remove('copied'); }, 2200);
+  }
+
+  navigator.clipboard.writeText(text).then(showConfirm).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showConfirm();
+  });
+});
+
+// ============================================================
+//  RESIZE + RENDER
+// ============================================================
+function handleResize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', handleResize);
+
+function animate() {
+  requestAnimationFrame(animate);
+  tickViewAnim();
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+handleResize();
+applyCssTheme();
+rebuildTower();
+applyViewPreset(state.cameraAngle); // start at the default preset, no opening animation
+animate();
+</script>
+</body>
+</html>
