@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stair Lab | Parametric Stair Designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14161b;
+    --panel: #1c1f26;
+    --panel-2: #232732;
+    --line: #2e3340;
+    --ink: #d6dae3;
+    --ink-dim: #8a91a0;
+    --amber: #ffb000;
+    --amber-dim: #b87f00;
+    --cyan: #3fb6c9;
+    --red: #ff5c5c;
+    --green: #44d78a;
+    --mono: 'IBM Plex Mono', monospace;
+    --disp: 'Barlow Condensed', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    height: 52px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  header .logo {
+    font-family: var(--disp);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  header .logo span { color: var(--amber); }
+  header .tag {
+    color: var(--ink-dim);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-left: 1px solid var(--line);
+    padding-left: 16px;
+  }
+  header .spacer { flex: 1; }
+  button.export {
+    font-family: var(--disp);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: var(--amber);
+    color: #14161b;
+    border: none;
+    padding: 9px 22px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button.export:hover { background: #ffc233; }
+
+  /* ---------- layout ---------- */
+  main { flex: 1; display: flex; min-height: 0; }
+  #panel {
+    width: 372px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding-bottom: 40px;
+  }
+  #viewport { flex: 1; position: relative; min-width: 0; }
+  #viewport canvas { display: block; }
+  #fitBtn {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  #fitBtn:hover { color: var(--amber); border-color: var(--amber-dim); }
+  #legend {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    color: var(--ink-dim);
+    font-size: 10px;
+    letter-spacing: .5px;
+    line-height: 1.7;
+    pointer-events: none;
+  }
+  #legend b { color: var(--ink); font-weight: 500; }
+
+  /* ---------- panel sections ---------- */
+  section { border-bottom: 1px solid var(--line); padding: 16px 18px; }
+  h2 {
+    font-family: var(--disp);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  h2 .chev, .flight h3 .chev {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 10px;
+    color: var(--ink-dim);
+    transition: transform .15s;
+  }
+  section.closed h2 { margin-bottom: 0; }
+  section.closed h2 .chev { transform: rotate(-90deg); }
+  section.closed .sec-body { display: none; }
+  .flight.closed h3 { margin-bottom: 0; }
+  .flight.closed h3 .chev { transform: rotate(-90deg); }
+  .flight.closed .fbody { display: none; }
+  .mini {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--ink-dim);
+    margin-left: 8px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .row label { flex: 1; color: var(--ink-dim); letter-spacing: .5px; }
+  .row .unit { color: var(--ink-dim); width: 22px; font-size: 10px; }
+  input[type=number], select {
+    width: 78px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 8px;
+    outline: none;
+  }
+  select { width: 100%; }
+  input[type=number]:focus, select:focus { border-color: var(--amber-dim); }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { opacity: 1; }
+  input[type=checkbox] {
+    accent-color: var(--amber);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+  .dispnote {
+    color: var(--ink-dim);
+    font-size: 10px;
+    letter-spacing: .5px;
+    margin-top: 6px;
+  }
+
+  .codecard {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--ink-dim);
+  }
+  .codecard b { color: var(--ink); font-weight: 500; }
+
+  /* ---------- flight cards ---------- */
+  .flight {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--amber-dim);
+    margin-bottom: 14px;
+    padding: 12px 14px;
+  }
+  .flight.bad { border-left-color: var(--red); }
+  .flight h3 {
+    font-family: var(--disp);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    margin-left: auto;
+  }
+  .badge.ok { background: rgba(68,215,138,.12); color: var(--green); border: 1px solid rgba(68,215,138,.35); }
+  .badge.err { background: rgba(255,92,92,.12); color: var(--red); border: 1px solid rgba(255,92,92,.4); }
+
+  .shapes { display: flex; gap: 6px; margin: 10px 0; }
+  .shapes button, .rotbtn {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 6px 0;
+    cursor: pointer;
+  }
+  .shapes select { flex: 1; width: auto; }
+  .shapes button.on { border-color: var(--amber); color: var(--amber); }
+  .shapes button.fitbtn { color: var(--ink-dim); letter-spacing: .5px; }
+  .shapes button.fitbtn:hover { color: var(--amber); border-color: var(--amber-dim); }
+  .rotbtn { flex: 0 0 64px; }
+  .rotbtn:hover { color: var(--ink); }
+
+  .readout {
+    border-top: 1px dashed var(--line);
+    margin-top: 10px;
+    padding-top: 9px;
+    font-size: 11px;
+    line-height: 1.9;
+    color: var(--ink-dim);
+  }
+  .readout b { color: var(--ink); font-weight: 500; }
+  .readout .fit-ok { color: var(--green); }
+  .readout .fit-bad { color: var(--red); }
+  .issues { margin-top: 6px; }
+  .issues div { color: var(--red); font-size: 10px; line-height: 1.6; }
+  .issues div::before { content: '! '; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--panel); }
+  ::-webkit-scrollbar-thumb { background: var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Stair<span>Lab</span></div>
+  <div class="tag">Parametric Multi-Level Stair Designer</div>
+  <div class="spacer"></div>
+  <button class="export" id="loadBtn">Load Design</button>
+  <button class="export" id="exportBtn">Export Design</button>
+  <input type="file" id="loadFile" accept=".json,application/json" style="display:none">
+</header>
+
+<main>
+  <div id="panel">
+
+    <section>
+      <h2><span class="chev">&#9662;</span>Building Code</h2>
+      <div class="sec-body">
+        <select id="codeSel"></select>
+        <div class="codecard" id="codeCard"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="chev">&#9662;</span>Stair Parameters</h2>
+      <div class="sec-body">
+        <div class="row"><label>Stair width</label><input type="number" id="widthIn" min="24" max="96" step="1"><span class="unit">in</span></div>
+        <div class="row"><label>Tread depth</label><input type="number" id="treadIn" min="8" max="16" step="0.25"><span class="unit">in</span></div>
+        <div class="row"><label>Number of floors</label><input type="number" id="floors" min="2" max="8" step="1"><span class="unit"></span></div>
+        <div class="issues" id="globalIssues"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="chev">&#9662;</span>Railing Defaults</h2>
+      <div class="sec-body">
+        <div class="shapes">
+          <button id="gRailL"></button>
+          <button id="gRailR"></button>
+        </div>
+        <div class="shapes">
+          <button id="gGuards"></button>
+          <button id="gLandRail"></button>
+        </div>
+        <div class="shapes"><button id="fitAll">FIT ALL OPENINGS TO STAIRS</button></div>
+        <div class="dispnote">Defaults for every stair. Card buttons override per flight; parenthesized values are inherited.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="chev">&#9662;</span>Display</h2>
+      <div class="sec-body" id="displayChecks">
+        <div class="row"><label>Stairs</label><input type="checkbox" data-d="stairs" checked></div>
+        <div class="row"><label>Landings</label><input type="checkbox" data-d="landings" checked></div>
+        <div class="row"><label>Railings</label><input type="checkbox" data-d="rails" checked></div>
+        <div class="row"><label>Opening outlines</label><input type="checkbox" data-d="outlines" checked></div>
+        <div class="row"><label>Grid</label><input type="checkbox" data-d="grid" checked></div>
+        <div class="dispnote">View only. Does not affect the JSON export.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="chev">&#9662;</span>Flights</h2>
+      <div class="sec-body">
+        <div id="flightCards"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="viewport">
+    <button id="fitBtn">FIT VIEW</button>
+    <div id="legend">
+      <b>drag</b> rotate &nbsp; <b>wheel</b> zoom &nbsp; <b>shift+drag</b> pan<br>
+      cyan planes = floor slabs with openings &nbsp; red = code or fit failure
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+/* =========================================================================
+   STAIR LAB - parametric multi-level stair designer
+   Single-file teaching example for ArchSmarter.
+   All internal math is in feet. UI shows inches where conventional.
+   Plan coordinates: origin at opening corner, X east, Y north.
+   Three.js mapping: plan (x, y) at elevation e renders at (x, e, -y).
+   ========================================================================= */
+
+/* ---------- 1. building code data ----------
+   Codes are plain data objects so adding IRC, ADA, or international
+   codes later means adding one entry here, nothing else. */
+const CODES = {
+  IBC_2021: {
+    label: 'IBC 2021 (1011)',
+    maxRiserIn: 7,        // 1011.5.2 max riser height
+    minRiserIn: 4,        // 1011.5.2 min riser height
+    minTreadIn: 11,       // 1011.5.2 min tread depth
+    minWidthIn: 44,       // 1011.2 (36 in permitted when occupant load < 50)
+    maxRiseFt: 12,        // 1011.8 max vertical rise between landings
+    maxLandingIn: 48,     // 1011.6 landing depth need not exceed 48 in (straight)
+    guardIn: 42,
+    handrailIn: [34, 38],
+    extTopIn: 12,           // 1014.6 horizontal extension beyond top riser
+    extBottomTreads: 1,     // 1014.6 sloped extension, one tread beyond bottom riser
+    extBottomHorizIn: 12    // level termination after the sloped portion (accessible detail, CBC 11A style)
+  }
+};
+
+/* ---------- 2. application state ---------- */
+const state = {
+  code: 'IBC_2021',
+  widthIn: 44,
+  treadIn: 11,
+  floors: 3,
+  railL: 'floor', railR: 'floor', guards: 'floor', landRail: 'floor', // railing defaults; flights inherit unless overridden
+  flights: [], // { ftf, openW, openL, shape, rot, rails, landingIn }
+  display: { stairs: true, landings: true, rails: true, outlines: true, grid: true } // view only
+};
+
+function defaultFlight() {
+  return {
+    ftf: 10, openW: 12, openL: 16, shape: 'U', rot: 0, mirror: false,
+    floorLandIn: null,   // floor level landing strip depth, in; null = code default, 0 = none
+    railL: null, railR: null, // 'floor' | 'wall' | 'off' | null = inherit global
+    guards: null,             // landing guards, same values, null = inherit
+    landRail: null,           // landing handrail connector, same values, null = inherit
+    offsetTread: true, // stagger upper run one tread for a clean rail transition
+    gapIn: 4,        // clear gap between U-stair runs, inches
+    landingIn: null, // landing depth override in inches, null = auto
+    _open: true      // card expander state, UI only, never exported
+  };
+}
+
+function ensureFlights() {
+  const need = state.floors - 1;
+  while (state.flights.length < need) state.flights.push(defaultFlight());
+  state.flights.length = need;
+}
+
+/* ---------- 3. stair math ----------
+   Convention: a run with n risers has n - 1 treads. You step up the
+   final riser onto the landing or floor, whose surface acts as the
+   last tread. Run plan length = (n - 1) * treadDepth. */
+
+function splitRisers(N) {
+  const n1 = Math.ceil(N / 2);
+  return [n1, N - n1];
+}
+
+/* Build a flight layout in LOCAL coordinates (before rotation).
+   Local frame: stair anchored at (0,0), first run travels +Y.
+   Returns runs, landings, extents, and validation issues. */
+function layoutFlight(f, code) {
+  const W = state.widthIn / 12;
+  const T = state.treadIn / 12;
+  // IBC 1011.6: landing depth >= stair width, need not exceed 48 in
+  const minLD = Math.min(W, code.maxLandingIn / 12);
+  const LD = f.landingIn ? f.landingIn / 12 : minLD;
+
+  const N = Math.max(2, Math.ceil((f.ftf * 12) / code.maxRiserIn));
+  const riserH = f.ftf / N;            // feet
+  const riserIn = riserH * 12;
+
+  const runs = [];      // { sx, sy, ex, ey, risers, startIdx, name }
+  const landings = [];  // { x0, y0, x1, y1, topRisers, name }
+  const issues = [];
+  let extW = 0, extL = 0;
+
+  if (riserIn < code.minRiserIn) {
+    issues.push('Riser ' + riserIn.toFixed(2) + ' in is below code minimum ' + code.minRiserIn + ' in');
+  }
+  if (LD + 1e-6 < minLD) {
+    issues.push('Landing depth ' + (LD * 12).toFixed(0) + ' in is below code minimum ' + (minLD * 12).toFixed(0) + ' in (depth must equal stair width, max 48 in)');
+  }
+
+  if (f.shape === 'straight') {
+    if (f.ftf > code.maxRiseFt) {
+      // split into two runs with an intermediate landing
+      const [n1, n2] = splitRisers(N);
+      const L1 = (n1 - 1) * T, L2 = (n2 - 1) * T;
+      runs.push({ sx: W / 2, sy: 0, ex: W / 2, ey: L1, risers: n1, startIdx: 0, name: 'Run A' });
+      landings.push({ x0: 0, y0: L1, x1: W, y1: L1 + LD, topRisers: n1, name: 'Landing 1' });
+      runs.push({ sx: W / 2, sy: L1 + LD, ex: W / 2, ey: L1 + LD + L2, risers: n2, startIdx: n1, name: 'Run B' });
+      extW = W; extL = L1 + LD + L2;
+      if (n1 * riserH > code.maxRiseFt || n2 * riserH > code.maxRiseFt) {
+        issues.push('Rise exceeds ' + code.maxRiseFt + ' ft even with one landing. v1 does not place multiple intermediate landings.');
+      }
+    } else {
+      runs.push({ sx: W / 2, sy: 0, ex: W / 2, ey: (N - 1) * T, risers: N, startIdx: 0, name: 'Run A' });
+      extW = W; extL = (N - 1) * T;
+    }
+  }
+
+  else if (f.shape === 'U') {
+    const G = (f.gapIn != null ? f.gapIn : 4) / 12; // clear gap between runs
+    const off = f.offsetTread ? T : 0; // stagger upper run one tread
+    const [n1, n2] = splitRisers(N);
+    const L1 = (n1 - 1) * T, L2 = (n2 - 1) * T;
+    const Lmax = Math.max(L1, L2);
+    // run 1 climbs +Y on the left, half landing at the far end,
+    // run 2 returns -Y on the right; with tread offset, run 2's bottom
+    // riser sits one tread beyond the landing edge on a landing tab,
+    // letting the handrail transition at the stair pitch (no gooseneck)
+    runs.push({ sx: W / 2, sy: Lmax - L1, ex: W / 2, ey: Lmax, risers: n1, startIdx: 0, name: 'Run A' });
+    landings.push({ x0: 0, y0: Lmax, x1: 2 * W + G, y1: Lmax + LD, topRisers: n1, name: 'Landing 1' });
+    if (off > 0) {
+      landings.push({ x0: W + G, y0: Lmax - off, x1: 2 * W + G, y1: Lmax, topRisers: n1, name: 'Landing 1 tab' });
+    }
+    const x2 = W + G + W / 2;
+    runs.push({ sx: x2, sy: Lmax - off, ex: x2, ey: Lmax - off - L2, risers: n2, startIdx: n1, name: 'Run B' });
+    extW = 2 * W + G; extL = Lmax + LD;
+    if (n1 * riserH > code.maxRiseFt || n2 * riserH > code.maxRiseFt) {
+      issues.push('Rise per leg exceeds ' + code.maxRiseFt + ' ft. Add floors or use a different shape.');
+    }
+    if (N < 4) issues.push('Too few risers for a U configuration.');
+  }
+
+  else { // L shape
+    const off = f.offsetTread ? T : 0; // stagger upper run one tread
+    const [n1, n2] = splitRisers(N);
+    const L1 = (n1 - 1) * T, L2 = (n2 - 1) * T;
+    // run 1 climbs +Y, corner landing (W wide, LD deep), run 2 climbs +X
+    // aligned to the far edge of the landing; with tread offset, run 2's
+    // bottom riser sits one tread beyond the corner on a landing tab
+    runs.push({ sx: W / 2, sy: 0, ex: W / 2, ey: L1, risers: n1, startIdx: 0, name: 'Run A' });
+    landings.push({ x0: 0, y0: L1, x1: W, y1: L1 + LD, topRisers: n1, name: 'Landing 1' });
+    const y2 = L1 + LD - W / 2;
+    if (off > 0) {
+      landings.push({ x0: W, y0: y2 - W / 2, x1: W + off, y1: y2 + W / 2, topRisers: n1, name: 'Landing 1 tab' });
+    }
+    runs.push({ sx: W + off, sy: y2, ex: W + off + L2, ey: y2, risers: n2, startIdx: n1, name: 'Run B' });
+    extW = W + off + L2; extL = L1 + LD;
+    if (n1 * riserH > code.maxRiseFt || n2 * riserH > code.maxRiseFt) {
+      issues.push('Rise per leg exceeds ' + code.maxRiseFt + ' ft. Add floors or use a different shape.');
+    }
+    if (N < 4) issues.push('Too few risers for an L configuration.');
+  }
+
+  // normalize: translate so the footprint bbox starts at (0,0) and
+  // recompute extents (offsets can push geometry into negative space)
+  if (runs.length) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    runs.forEach(r => {
+      const vert = Math.abs(r.ex - r.sx) < 1e-9;
+      minX = Math.min(minX, vert ? r.sx - W / 2 : Math.min(r.sx, r.ex));
+      maxX = Math.max(maxX, vert ? r.sx + W / 2 : Math.max(r.sx, r.ex));
+      minY = Math.min(minY, vert ? Math.min(r.sy, r.ey) : r.sy - W / 2);
+      maxY = Math.max(maxY, vert ? Math.max(r.sy, r.ey) : r.sy + W / 2);
+    });
+    landings.forEach(l => {
+      minX = Math.min(minX, l.x0); maxX = Math.max(maxX, l.x1);
+      minY = Math.min(minY, l.y0); maxY = Math.max(maxY, l.y1);
+    });
+    runs.forEach(r => { r.sx -= minX; r.ex -= minX; r.sy -= minY; r.ey -= minY; });
+    landings.forEach(l => { l.x0 -= minX; l.x1 -= minX; l.y0 -= minY; l.y1 -= minY; });
+    extW = maxX - minX;
+    extL = maxY - minY;
+  }
+
+  return { N, riserH, riserIn, W, T, LD, runs, landings, extW, extL, issues };
+}
+
+/* Railing math. Builds rail segments in plan coordinates with elevations.
+   Handrails follow the nosing line along each run at the midpoint of the
+   code handrail range. Per IBC 1014.6, extensions appear only at rail ends
+   where the handrail is NOT continuous: interior run ends (where the stair
+   continues across a landing) get a landing connector instead. Guards run
+   along free landing edges at guard height. Each side carries a mount:
+   'floor' (posts) or 'wall' (bracket mounted, no posts). */
+function buildRails(fl, code) {
+  const rails = [];
+  const hr = ((code.handrailIn[0] + code.handrailIn[1]) / 2) / 12; // 36 in
+  const gd = code.guardIn / 12;
+  const extTop = code.extTopIn / 12;
+  const extBot = code.extBottomTreads * fl.T;
+  const extBotH = code.extBottomHorizIn / 12;
+  const hh = Math.round(hr * 12);
+
+  const sides = [];
+  if (fl.railL !== 'off') sides.push({ key: 'left',  mount: fl.railL,  n: (dx, dy) => [-dy, dx] });
+  if (fl.railR !== 'off') sides.push({ key: 'right', mount: fl.railR, n: (dx, dy) => [dy, -dx] });
+
+  // run mouth centerline points: landing connectors must not cross these
+  const mouths = [];
+  fl.runs.forEach(r => { mouths.push([r.sx, r.sy], [r.ex, r.ey]); });
+
+  const endPts = {}; // per side: rail endpoints per run, in run order
+
+  // direct junctions: where consecutive runs face each other with rail
+  // ends within one stair width (the inside rail of a switchback), or
+  // meet at an inside corner within one tread (an L corner, with or
+  // without the tread offset), the rail transitions run to run at the
+  // stair pitch, like the floor connector. This is run rail continuity,
+  // not a landing perimeter rail, so it exists regardless of the
+  // landing rail control and follows the side rail mount
+  const directJ = {}; // 'junction:side' -> true
+  for (let k = 0; k + 1 < fl.runs.length; k++) {
+    const r1 = fl.runs[k], r2 = fl.runs[k + 1];
+    const dx1 = Math.sign(r1.ex - r1.sx), dy1 = Math.sign(r1.ey - r1.sy);
+    const dx2 = Math.sign(r2.ex - r2.sx), dy2 = Math.sign(r2.ey - r2.sy);
+    const antiParallel = dx1 * dx2 + dy1 * dy2 < -0.5;
+    sides.forEach(s => {
+      const n1 = s.n(dx1, dy1), n2 = s.n(dx2, dy2);
+      const ex = r1.ex + n1[0] * fl.W / 2, ey = r1.ey + n1[1] * fl.W / 2;
+      const sx = r2.sx + n2[0] * fl.W / 2, sy = r2.sy + n2[1] * fl.W / 2;
+      const d = Math.hypot(sx - ex, sy - ey);
+      if (d <= fl.W + 0.01 && (antiParallel || d <= fl.T + 0.05)) {
+        directJ[k + ':' + s.key] = true;
+      }
+    });
+  }
+
+  fl.runs.forEach((r, k) => {
+    const dx = Math.sign(r.ex - r.sx), dy = Math.sign(r.ey - r.sy);
+    const e0 = fl.baseElev + (r.startIdx + 1) * fl.riserH;          // first nosing
+    const e1 = fl.baseElev + (r.startIdx + r.risers) * fl.riserH;   // top of run
+    sides.forEach(s => {
+      const n = s.n(dx, dy);
+      // the rail continues where a direct run to run transition exists,
+      // or where the landing handrail carries it along the perimeter.
+      // With the landing rail off, perimeter ends get extensions back
+      // (1014.6) but direct transitions keep their continuity
+      const contLanding = fl.landRail !== 'off';
+      const contBottom = k > 0 && (contLanding || !!directJ[(k - 1) + ':' + s.key]);
+      const contTop = k < fl.runs.length - 1 && (contLanding || !!directJ[k + ':' + s.key]);
+      const ax = r.sx + n[0] * fl.W / 2, ay = r.sy + n[1] * fl.W / 2;
+      const bx = r.ex + n[0] * fl.W / 2, by = r.ey + n[1] * fl.W / 2;
+      // main sloped rail along the run
+      rails.push({
+        name: r.name + ' rail ' + s.key,
+        category: 'handrail', side: s.key, mount: s.mount, segment: 'run', height_in: hh,
+        a: [ax, ay, e0 + hr],
+        b: [bx, by, e1 + hr]
+      });
+      // IBC 1014.6 bottom extension, only where the rail does not continue:
+      // slope for one tread depth beyond the bottom riser, then terminate
+      // with a level segment parallel to the floor (tread + 12 in total)
+      if (!contBottom) {
+        const lowZ = e0 + hr - fl.riserH; // 36 in above the lower floor
+        rails.push({
+          name: r.name + ' rail ' + s.key + ' ext bottom',
+          category: 'handrail', side: s.key, mount: s.mount, segment: 'ext_bottom', height_in: hh,
+          a: [ax - dx * extBot, ay - dy * extBot, lowZ],
+          b: [ax, ay, e0 + hr]
+        });
+        rails.push({
+          name: r.name + ' rail ' + s.key + ' ext bottom level',
+          category: 'handrail', side: s.key, mount: s.mount, segment: 'ext_bottom_horiz', height_in: hh,
+          a: [ax - dx * (extBot + extBotH), ay - dy * (extBot + extBotH), lowZ],
+          b: [ax - dx * extBot, ay - dy * extBot, lowZ]
+        });
+      }
+      // IBC 1014.6 top extension, only where the rail does not continue:
+      // 12 in horizontal beyond the top riser
+      if (!contTop) rails.push({
+        name: r.name + ' rail ' + s.key + ' ext top',
+        category: 'handrail', side: s.key, mount: s.mount, segment: 'ext_top', height_in: hh,
+        a: [bx, by, e1 + hr],
+        b: [bx + dx * extTop, by + dy * extTop, e1 + hr]
+      });
+      (endPts[s.key] = endPts[s.key] || []).push({ start: [ax, ay, e0 + hr], end: [bx, by, e1 + hr] });
+    });
+  });
+
+  // landing connectors: continuous handrail between consecutive runs.
+  // Direct junctions transition run to run (level across, then up at the
+  // stair pitch) with the side rail mount, and exist regardless of the
+  // landing rail control. Other junctions route along the landing
+  // perimeter away from the run mouths, mounted per the landing rail
+  // control (wall = bar on a back wall), and disappear when it is off
+  sides.forEach(s => {
+    const pts = endPts[s.key] || [];
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const p1 = pts[k].end, p2 = pts[k + 1].start;
+      const railZ = p1[2];
+      let segs = null, mount = null;
+      if (directJ[k + ':' + s.key]) {
+        mount = s.mount;
+        segs = [];
+        const rNext = fl.runs[k + 1];
+        const dxn = Math.sign(rNext.ex - rNext.sx), dyn = Math.sign(rNext.ey - rNext.sy);
+        const dPlan = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+        const q = [p2[0] - dxn * fl.T, p2[1] - dyn * fl.T];
+        const dq = Math.hypot(q[0] - p1[0], q[1] - p1[1]);
+        if (dq <= dPlan + 1e-6) {
+          // tread offset aligns the nosing lines: level across the gap,
+          // then up the next run at the stair pitch
+          if (dq > 0.01) segs.push([[p1[0], p1[1], railZ], [q[0], q[1], railZ]]);
+          segs.push([[q[0], q[1], railZ], [p2[0], p2[1], p2[2]]]);
+        } else {
+          // no stagger: level across, vertical gooseneck at the next run
+          if (dPlan > 0.01) segs.push([[p1[0], p1[1], railZ], [p2[0], p2[1], railZ]]);
+          if (Math.abs(p2[2] - railZ) > 1e-6) segs.push([[p2[0], p2[1], railZ], [p2[0], p2[1], p2[2]]]);
+        }
+      } else if (fl.landRail !== 'off') {
+        const land = fl.landings[k]; // consecutive runs share landing k
+        if (!land) continue;
+        mount = fl.landRail;
+        segs = connectorPath(p1, p2, land, mouths, fl.W, railZ);
+      }
+      if (segs) segs.forEach((seg, j) => rails.push({
+        name: 'Connector ' + s.key + ' ' + (k + 1) + '.' + (j + 1),
+        category: 'handrail', side: s.key, mount: mount,
+        segment: 'landing_connector', height_in: hh,
+        a: seg[0], b: seg[1]
+      }));
+    }
+  });
+
+  if (fl.guards !== 'off') fl.landings.forEach((l, li) => {
+    const elev = fl.baseElev + l.topRisers * fl.riserH;
+    const c = [[l.x0, l.y0], [l.x1, l.y0], [l.x1, l.y1], [l.x0, l.y1]];
+    for (let e = 0; e < 4; e++) {
+      const p = c[e], q = c[(e + 1) % 4];
+      if (edgeOccupied(p, q, fl.runs, fl.landings, li)) continue;
+      rails.push({
+        name: l.name + ' guard ' + (e + 1),
+        category: 'guard', side: 'landing', mount: fl.guards, segment: 'landing_edge',
+        height_in: code.guardIn,
+        a: [p[0], p[1], elev + gd],
+        b: [q[0], q[1], elev + gd]
+      });
+    }
+  });
+
+  return rails;
+}
+
+/* Route a connector between two rail endpoints along the perimeter of a
+   rectangular landing. Of the two perimeter arcs between the points, pick
+   the shortest one that does not pass within half a stair width of any run
+   mouth (which would fence off a run). The path runs level at rail height
+   above the landing and finishes with a vertical gooseneck up to the next
+   run's rail, the way a continuous railing transitions at a newel. */
+function connectorPath(p1, p2, land, mouths, W, railZ) {
+  // degenerate: same plan point (e.g. inside corner of an L), vertical jog
+  if (Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) < 0.05) {
+    return [[[p1[0], p1[1], railZ], [p2[0], p2[1], p2[2]]]];
+  }
+  const corners = [[land.x0, land.y0], [land.x1, land.y0], [land.x1, land.y1], [land.x0, land.y1]];
+  const lens = [], cornerTs = [];
+  let total = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i], b = corners[(i + 1) % 4];
+    cornerTs.push(total);
+    const L = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+    lens.push(L);
+    total += L;
+  }
+  const paramOf = pt => {
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i], b = corners[(i + 1) % 4];
+      if (Math.abs(a[0] - b[0]) < 1e-9) { // vertical edge
+        if (Math.abs(pt[0] - a[0]) < 0.05 &&
+            pt[1] >= Math.min(a[1], b[1]) - 0.05 && pt[1] <= Math.max(a[1], b[1]) + 0.05)
+          return cornerTs[i] + Math.abs(pt[1] - a[1]);
+      } else { // horizontal edge
+        if (Math.abs(pt[1] - a[1]) < 0.05 &&
+            pt[0] >= Math.min(a[0], b[0]) - 0.05 && pt[0] <= Math.max(a[0], b[0]) + 0.05)
+          return cornerTs[i] + Math.abs(pt[0] - a[0]);
+      }
+    }
+    return null;
+  };
+  const pointAt = t => {
+    t = ((t % total) + total) % total;
+    for (let i = 0; i < 4; i++) {
+      if (t <= lens[i] + 1e-9) {
+        const a = corners[i], b = corners[(i + 1) % 4];
+        const u = lens[i] === 0 ? 0 : t / lens[i];
+        return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+      }
+      t -= lens[i];
+    }
+    return corners[0].slice();
+  };
+  const t1 = paramOf(p1);
+  let t2 = paramOf(p2);
+  // when the next run is tread-offset, its rail starts beyond the landing
+  // rectangle: route to the nearest perimeter point, then slope over the
+  // offset tread at the stair pitch (this replaces the gooseneck)
+  let tail = null;
+  let target = [p2[0], p2[1]];
+  if (t1 !== null && t2 === null) {
+    const q = nearestOnRect(p2, corners);
+    tail = [[q[0], q[1], railZ], [p2[0], p2[1], p2[2]]];
+    target = q;
+    t2 = paramOf(q);
+  }
+  if (t1 === null || t2 === null) {
+    return [[[p1[0], p1[1], railZ], [p2[0], p2[1], p2[2]]]]; // fallback: straight
+  }
+  // the two perimeter arcs, with corners inserted in walking order
+  const arc = dir => {
+    const dist = dir > 0 ? ((t2 - t1 + total) % total) : ((t1 - t2 + total) % total);
+    const between = [];
+    cornerTs.forEach(ct => {
+      const d = dir > 0 ? ((ct - t1 + total) % total) : ((t1 - ct + total) % total);
+      if (d > 1e-6 && d < dist - 1e-6) between.push({ d, ct });
+    });
+    between.sort((a, b) => a.d - b.d);
+    const pts = [[p1[0], p1[1]]];
+    between.forEach(c => pts.push(pointAt(c.ct)));
+    pts.push([target[0], target[1]]);
+    return pts;
+  };
+  const polyLen = poly => {
+    let L = 0;
+    for (let i = 0; i + 1 < poly.length; i++) L += Math.hypot(poly[i + 1][0] - poly[i][0], poly[i + 1][1] - poly[i][1]);
+    return L;
+  };
+  const clear = poly => {
+    for (const m of mouths) {
+      for (let i = 0; i + 1 < poly.length; i++) {
+        if (segPointDist(poly[i], poly[i + 1], m) < W / 2 - 0.05) return false;
+      }
+    }
+    return true;
+  };
+  const cands = [arc(1), arc(-1)].map(p => ({ p, len: polyLen(p), ok: clear(p) }));
+  cands.sort((a, b) => (a.ok === b.ok) ? a.len - b.len : (a.ok ? -1 : 1));
+  const poly = cands[0].p;
+  // level at rail height across the landing; finish with either the sloped
+  // tail over the offset tread or a vertical gooseneck at the next run
+  const segs = [];
+  for (let i = 0; i + 1 < poly.length; i++) {
+    if (Math.hypot(poly[i + 1][0] - poly[i][0], poly[i + 1][1] - poly[i][1]) < 0.01) continue;
+    segs.push([
+      [poly[i][0], poly[i][1], railZ],
+      [poly[i + 1][0], poly[i + 1][1], railZ]
+    ]);
+  }
+  if (tail) {
+    segs.push(tail);
+  } else if (Math.abs(p2[2] - railZ) > 1e-6) {
+    segs.push([[p2[0], p2[1], railZ], [p2[0], p2[1], p2[2]]]);
+  }
+  return segs;
+}
+
+/* Nearest point on an axis-aligned rectangle perimeter to a plan point. */
+function nearestOnRect(p, corners) {
+  let best = null, bestD = Infinity;
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i], b = corners[(i + 1) % 4];
+    const vx = b[0] - a[0], vy = b[1] - a[1];
+    const L2 = vx * vx + vy * vy;
+    let u = L2 === 0 ? 0 : ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L2;
+    u = Math.max(0, Math.min(1, u));
+    const q = [a[0] + vx * u, a[1] + vy * u];
+    const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < bestD) { bestD = d; best = q; }
+  }
+  return best;
+}
+
+/* Minimum distance from point p to the segment a-b, all in plan. */
+function segPointDist(a, b, p) {
+  const vx = b[0] - a[0], vy = b[1] - a[1];
+  const L2 = vx * vx + vy * vy;
+  let u = L2 === 0 ? 0 : ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L2;
+  u = Math.max(0, Math.min(1, u));
+  return Math.hypot(p[0] - (a[0] + vx * u), p[1] - (a[1] + vy * u));
+}
+
+/* True when a run start or end point lies on the axis-aligned edge p-q,
+   or when the edge is a seam covered by another landing rectangle. */
+function edgeOccupied(p, q, runs, landings, selfIdx) {
+  const onEdge = pt =>
+    pt[0] >= Math.min(p[0], q[0]) - 0.05 && pt[0] <= Math.max(p[0], q[0]) + 0.05 &&
+    pt[1] >= Math.min(p[1], q[1]) - 0.05 && pt[1] <= Math.max(p[1], q[1]) + 0.05;
+  if (runs.some(r => onEdge([r.sx, r.sy]) || onEdge([r.ex, r.ey]))) return true;
+  if (landings) {
+    const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+    for (let i = 0; i < landings.length; i++) {
+      if (i === selfIdx) continue;
+      const l = landings[i];
+      if (mx >= l.x0 - 0.02 && mx <= l.x1 + 0.02 &&
+          my >= l.y0 - 0.02 && my <= l.y1 + 0.02) return true;
+    }
+  }
+  return false;
+}
+
+/* Rotation transform. Maps local bbox [0,extW] x [0,extL] onto a
+   rotated bbox anchored at (0,0) so the stair stays inside the opening. */
+function makeTransform(rot, extW, extL, mirror) {
+  // mirror reflects the layout across its local vertical axis before
+  // rotation, flipping L/U handedness (turn direction at landings)
+  const mx = mirror ? (x => extW - x) : (x => x);
+  switch (rot) {
+    case 90:  return { f: (x, y) => [extL - y, mx(x)],        w: extL, l: extW };
+    case 180: return { f: (x, y) => [extW - mx(x), extL - y], w: extW, l: extL };
+    case 270: return { f: (x, y) => [y, extW - mx(x)],        w: extL, l: extW };
+    default:  return { f: (x, y) => [mx(x), y],               w: extW, l: extL };
+  }
+}
+
+/* Full recompute of the model from state. */
+function compute() {
+  ensureFlights();
+  const code = CODES[state.code];
+  const globalIssues = [];
+
+  if (state.treadIn < code.minTreadIn) {
+    globalIssues.push('Tread ' + state.treadIn + ' in is below code minimum ' + code.minTreadIn + ' in');
+  }
+  if (state.widthIn < code.minWidthIn) {
+    globalIssues.push('Width ' + state.widthIn + ' in is below ' + code.minWidthIn + ' in (36 in allowed only when occupant load < 50)');
+  }
+
+  const levels = [{ name: 'Level 1', elevation: 0 }];
+  let elev = 0;
+  state.flights.forEach((f, i) => {
+    elev += f.ftf;
+    levels.push({ name: 'Level ' + (i + 2), elevation: round3(elev) });
+  });
+
+  const flights = state.flights.map((f, i) => {
+    const lay = layoutFlight(f, code);
+    const tr = makeTransform(f.rot, lay.extW, lay.extL, f.mirror);
+
+    const runs = lay.runs.map(r => {
+      const [sx, sy] = tr.f(r.sx, r.sy);
+      const [ex, ey] = tr.f(r.ex, r.ey);
+      return { sx, sy, ex, ey, risers: r.risers, startIdx: r.startIdx, name: r.name };
+    });
+    const landings = lay.landings.map(l => {
+      const [ax, ay] = tr.f(l.x0, l.y0);
+      const [bx, by] = tr.f(l.x1, l.y1);
+      return {
+        x0: Math.min(ax, bx), y0: Math.min(ay, by),
+        x1: Math.max(ax, bx), y1: Math.max(ay, by),
+        topRisers: l.topRisers, name: l.name
+      };
+    });
+
+    const fits = tr.w <= f.openW + 1e-6 && tr.l <= f.openL + 1e-6;
+    const issues = lay.issues.slice();
+    if (!fits) {
+      issues.push('Footprint ' + tr.w.toFixed(1) + ' x ' + tr.l.toFixed(1) +
+        ' ft exceeds opening ' + f.openW.toFixed(1) + ' x ' + f.openL.toFixed(1) + ' ft');
+    }
+
+    // floor level landing strip: the slab area inside the envelope where
+    // you step on and off this flight. Entry sides come from the run
+    // mouths: behind the first run's start, ahead of the last run's end
+    const fldMin = Math.min(state.widthIn, 48);
+    const fld = (f.floorLandIn === null || f.floorLandIn === undefined) ? fldMin : f.floorLandIn;
+    let entryBottom = null, entryTop = null;
+    if (runs.length && fld > 0) {
+      const r0 = runs[0], rN = runs[runs.length - 1];
+      entryBottom = Math.abs(r0.ex - r0.sx) >= Math.abs(r0.ey - r0.sy)
+        ? (r0.ex - r0.sx > 0 ? 'W' : 'E') : (r0.ey - r0.sy > 0 ? 'S' : 'N');
+      entryTop = Math.abs(rN.ex - rN.sx) >= Math.abs(rN.ey - rN.sy)
+        ? (rN.ex - rN.sx > 0 ? 'E' : 'W') : (rN.ey - rN.sy > 0 ? 'N' : 'S');
+    }
+    const entrySides = [];
+    if (entryBottom) entrySides.push(entryBottom);
+    if (entryTop && entryTop !== entryBottom) entrySides.push(entryTop);
+    if (fld > 0 && fld + 1e-6 < fldMin) {
+      issues.push('Floor landing ' + fld + ' in is below code minimum ' + fldMin + ' in (1011.6)');
+    }
+
+    const inh = (raw, glob) => (raw === null || raw === undefined) ? glob : raw;
+
+    const flObj = {
+      idx: i,
+      baseElev: levels[i].elevation,
+      topElev: levels[i + 1].elevation,
+      N: lay.N, riserH: lay.riserH, riserIn: lay.riserIn,
+      W: lay.W, T: lay.T,
+      landingUsedIn: round3(lay.LD * 12),
+      runs, landings,
+      footW: tr.w, footL: tr.l,
+      fits, issues,
+      shape: f.shape, rot: f.rot, mirror: !!f.mirror,
+      openW: f.openW, openL: f.openL,
+      gapIn: f.gapIn,
+      offsetTread: f.offsetTread,
+      floorLandIn: fld, entrySides: entrySides, entryBottom: entryBottom, entryTop: entryTop,
+      railL: inh(f.railL, state.railL), railR: inh(f.railR, state.railR),
+      guards: inh(f.guards, state.guards), landRail: inh(f.landRail, state.landRail)
+    };
+    flObj.rails = buildRails(flObj, code);
+    return flObj;
+  });
+
+  // inter-flight handrail continuity: where one flight's top run and the
+  // next flight's bottom run face each other (anti-parallel) and a rail end
+  // sits within one stair width of a rail start at the floor level, drop
+  // the extensions on those rails and wrap the rail across instead. Pairing
+  // is geometric (nearest end to nearest start), which handles both
+  // switchback wells (left pairs with left across the gap) and scissor
+  // stairs (one flight's left continues as the next flight's right).
+  // Non-adjacent ends keep their code extensions.
+  const hrC = ((code.handrailIn[0] + code.handrailIn[1]) / 2) / 12;
+  for (let i = 0; i + 1 < flights.length; i++) {
+    const f1 = flights[i], f2 = flights[i + 1];
+    const lastRun = f1.runs[f1.runs.length - 1], firstRun = f2.runs[0];
+    if (!lastRun || !firstRun) continue;
+    const dx1 = Math.sign(lastRun.ex - lastRun.sx), dy1 = Math.sign(lastRun.ey - lastRun.sy);
+    const dx2 = Math.sign(firstRun.ex - firstRun.sx), dy2 = Math.sign(firstRun.ey - firstRun.sy);
+    if (dx1 * dx2 + dy1 * dy2 > -0.5) continue; // runs must face each other
+    const findRail = (fl, run, side) =>
+      fl.rails.find(r => r.segment === 'run' && r.side === side && r.name.indexOf(run.name) === 0);
+    const ends = [], starts = [];
+    ['left', 'right'].forEach(s => {
+      const e = findRail(f1, lastRun, s);
+      if (e) ends.push({ side: s, rail: e });
+      const st = findRail(f2, firstRun, s);
+      if (st) starts.push({ side: s, rail: st });
+    });
+    const pairs = [];
+    ends.forEach(e => starts.forEach(s => {
+      const d = Math.hypot(s.rail.a[0] - e.rail.b[0], s.rail.a[1] - e.rail.b[1]);
+      if (d <= f1.W + 0.01) pairs.push({ e, s, d });
+    }));
+    pairs.sort((a, b) => a.d - b.d);
+    const usedE = {}, usedS = {};
+    pairs.forEach(pr => {
+      if (usedE[pr.e.side] || usedS[pr.s.side]) return;
+      usedE[pr.e.side] = true; usedS[pr.s.side] = true;
+      const p1 = pr.e.rail.b, p2 = pr.s.rail.a;
+      f1.rails = f1.rails.filter(r => !(r.side === pr.e.side &&
+        r.segment === 'ext_top' && r.name.indexOf(lastRun.name) === 0));
+      f2.rails = f2.rails.filter(r => !(r.side === pr.s.side &&
+        (r.segment === 'ext_bottom' || r.segment === 'ext_bottom_horiz') &&
+        r.name.indexOf(firstRun.name) === 0));
+      const railZ = p1[2]; // floor elevation + handrail height
+      const q = [p2[0] - dx2 * f2.T, p2[1] - dy2 * f2.T];
+      const dq = Math.hypot(q[0] - p1[0], q[1] - p1[1]);
+      const segs = [];
+      if (dq <= pr.d + 1e-6) {
+        // tread offset aligns the nosing lines: level across the well,
+        // then up the next run at the stair pitch
+        if (dq > 0.01) segs.push([[p1[0], p1[1], railZ], [q[0], q[1], railZ]]);
+        segs.push([[q[0], q[1], railZ], [p2[0], p2[1], p2[2]]]);
+      } else {
+        // no stagger: level across, vertical gooseneck at the next run
+        if (pr.d > 0.01) segs.push([[p1[0], p1[1], railZ], [p2[0], p2[1], railZ]]);
+        if (Math.abs(p2[2] - railZ) > 1e-6) segs.push([[p2[0], p2[1], railZ], [p2[0], p2[1], p2[2]]]);
+      }
+      segs.forEach((sg, j) => f1.rails.push({
+        name: 'Floor connector ' + pr.e.side + '-' + pr.s.side + ' L' + (i + 2) + '.' + (j + 1),
+        category: 'handrail', side: pr.e.side, mount: pr.e.rail.mount,
+        segment: 'floor_connector', height_in: Math.round(hrC * 12),
+        a: sg[0], b: sg[1]
+      }));
+    });
+  }
+
+  // envelope rectangles, one per level: each level's enclosure is the
+  // union of its adjacent flights' openings plus the strips that land
+  // there (the arrival strip of the flight below, the departure strip of
+  // the flight above). A flight with a deeper floor landing, such as an
+  // area of refuge, widens only the levels it touches. The shaft cut
+  // (the hole in the floors) stays the opening rectangle
+  function applyStrip(rect, side, openW, openL, d) {
+    if (side === 'S') rect.y0 = Math.min(rect.y0, -d);
+    if (side === 'N') rect.y1 = Math.max(rect.y1, openL + d);
+    if (side === 'W') rect.x0 = Math.min(rect.x0, -d);
+    if (side === 'E') rect.x1 = Math.max(rect.x1, openW + d);
+  }
+  const envelopes = levels.map((lv, j) => {
+    const rect = { x0: 0, y0: 0, x1: 0, y1: 0 };
+    const below = flights[j - 1], above = flights[j];
+    if (below) {
+      rect.x1 = Math.max(rect.x1, below.openW);
+      rect.y1 = Math.max(rect.y1, below.openL);
+      const d = below.floorLandIn / 12;
+      if (d > 0 && below.entryTop) applyStrip(rect, below.entryTop, below.openW, below.openL, d);
+    }
+    if (above) {
+      rect.x1 = Math.max(rect.x1, above.openW);
+      rect.y1 = Math.max(rect.y1, above.openL);
+      const d = above.floorLandIn / 12;
+      if (d > 0 && above.entryBottom) applyStrip(rect, above.entryBottom, above.openW, above.openL, d);
+    }
+    return rect;
+  });
+  const env = {
+    x0: Math.min.apply(null, envelopes.map(r => r.x0)),
+    y0: Math.min.apply(null, envelopes.map(r => r.y0)),
+    x1: Math.max.apply(null, envelopes.map(r => r.x1)),
+    y1: Math.max.apply(null, envelopes.map(r => r.y1))
+  };
+
+  return { code, levels, flights, envelope: env, envelopes: envelopes, globalIssues };
+}
+
+function round3(v) { return Math.round(v * 1000) / 1000; }
+
+/* ---------- 4. three.js scene ---------- */
+let scene, camera, renderer, stairGroup, orbit, gridRef, viewGroups = null;
+
+function initThree() {
+  const vp = document.getElementById('viewport');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14161b);
+  scene.fog = new THREE.Fog(0x14161b, 120, 320);
+
+  camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  vp.appendChild(renderer.domElement);
+
+  const hemi = new THREE.HemisphereLight(0xdde4f0, 0x20242e, 0.95);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+  dir.position.set(40, 70, 30);
+  scene.add(dir);
+
+  gridRef = new THREE.GridHelper(160, 80, 0x2e3340, 0x222630);
+  gridRef.position.y = -0.02;
+  scene.add(gridRef);
+
+  stairGroup = new THREE.Group();
+  scene.add(stairGroup);
+
+  orbit = new SimpleOrbit(camera, renderer.domElement);
+
+  window.addEventListener('resize', resize);
+  resize();
+  animate();
+}
+
+function resize() {
+  const vp = document.getElementById('viewport');
+  const w = vp.clientWidth, h = vp.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  orbit.update();
+  renderer.render(scene, camera);
+}
+
+/* Minimal orbit controls: drag rotates, wheel zooms, shift+drag pans. */
+class SimpleOrbit {
+  constructor(cam, dom) {
+    this.cam = cam;
+    this.target = new THREE.Vector3(8, 10, -8);
+    this.radius = 60; this.theta = 0.8; this.phi = 1.1;
+    this.dirty = true;
+    let drag = null;
+    dom.addEventListener('pointerdown', e => {
+      drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 };
+      dom.setPointerCapture(e.pointerId);
+    });
+    dom.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY;
+      if (drag.pan) {
+        const s = this.radius * 0.0014;
+        const fwd = new THREE.Vector3().subVectors(this.target, this.cam.position).setY(0).normalize();
+        const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+        this.target.addScaledVector(right, dx * s);
+        this.target.y += dy * s;
+      } else {
+        this.theta -= dx * 0.006;
+        this.phi = Math.min(Math.PI - 0.08, Math.max(0.08, this.phi - dy * 0.006));
+      }
+      this.dirty = true;
+    });
+    const end = () => { drag = null; };
+    dom.addEventListener('pointerup', end);
+    dom.addEventListener('pointerleave', end);
+    dom.addEventListener('wheel', e => {
+      e.preventDefault();
+      this.radius = Math.min(400, Math.max(6, this.radius * (1 + e.deltaY * 0.0012)));
+      this.dirty = true;
+    }, { passive: false });
+    dom.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  fit(center, radius) {
+    this.target.copy(center);
+    this.radius = radius;
+    this.dirty = true;
+  }
+  update() {
+    if (!this.dirty) return;
+    const sp = Math.sin(this.phi), cp = Math.cos(this.phi);
+    this.cam.position.set(
+      this.target.x + this.radius * sp * Math.sin(this.theta),
+      this.target.y + this.radius * cp,
+      this.target.z + this.radius * sp * Math.cos(this.theta)
+    );
+    this.cam.lookAt(this.target);
+    this.dirty = false;
+  }
+}
+
+/* Materials, shared. */
+const MAT = {
+  step:    new THREE.MeshStandardMaterial({ color: 0x9aa3b2, roughness: 0.85, metalness: 0.05 }),
+  stepBad: new THREE.MeshStandardMaterial({ color: 0xb84848, roughness: 0.85, metalness: 0.05 }),
+  land:    new THREE.MeshStandardMaterial({ color: 0x7c8696, roughness: 0.85, metalness: 0.05 }),
+  landBad: new THREE.MeshStandardMaterial({ color: 0x9e3d3d, roughness: 0.85, metalness: 0.05 }),
+  rail:    new THREE.MeshStandardMaterial({ color: 0xd99a14, roughness: 0.5, metalness: 0.35 }),
+  slab:    new THREE.MeshBasicMaterial({ color: 0x3fb6c9, transparent: true, opacity: 0.13, side: THREE.DoubleSide }),
+  edge:    new THREE.LineBasicMaterial({ color: 0x14161b }),
+  openEdge:new THREE.LineBasicMaterial({ color: 0x3fb6c9 }),
+  envEdge: new THREE.LineBasicMaterial({ color: 0xffb000 })
+};
+
+function addBox(group, w, h, d, x, y, z, mat) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(g, mat);
+  m.position.set(x, y, z);
+  group.add(m);
+  group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), MAT.edge).translateX(x).translateY(y).translateZ(z));
+}
+
+/* Render one run as stepped tread boxes. Runs are axis aligned. */
+function renderRun(group, run, fl, mat) {
+  const dx = Math.sign(run.ex - run.sx), dy = Math.sign(run.ey - run.sy);
+  const treads = run.risers - 1;
+  for (let j = 0; j < treads; j++) {
+    const cx = run.sx + dx * (j + 0.5) * fl.T;
+    const cy = run.sy + dy * (j + 0.5) * fl.T;
+    const top = fl.baseElev + (run.startIdx + j + 1) * fl.riserH;
+    const alongX = dx !== 0;
+    addBox(group,
+      alongX ? fl.T : fl.W, fl.riserH, alongX ? fl.W : fl.T,
+      cx, top - fl.riserH / 2, -cy, mat);
+  }
+}
+
+/* Rail rendering: top bar between two world points plus posts. */
+function railBar(group, a, b) {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  if (len < 0.01) return;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 0.16, 0.16), MAT.rail);
+  mesh.position.copy(a).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir.normalize());
+  group.add(mesh);
+}
+function railPost(group, top, h) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, h, 0.1), MAT.rail);
+  mesh.position.set(top.x, top.y - h / 2, top.z);
+  group.add(mesh);
+}
+function renderRails(group, fl) {
+  fl.rails.forEach(r => {
+    const a = new THREE.Vector3(r.a[0], r.a[2], -r.a[1]);
+    const b = new THREE.Vector3(r.b[0], r.b[2], -r.b[1]);
+    railBar(group, a, b);
+    if (r.mount === 'wall') return; // wall mounted: bar only, no posts
+    const h = r.height_in / 12;
+    railPost(group, a, h);
+    railPost(group, b, h);
+    if (a.distanceTo(b) > 6) {
+      railPost(group, new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5), h);
+    }
+  });
+}
+
+function renderModel(model) {
+  // dispose previous (traverse: meshes are nested in category groups)
+  while (stairGroup.children.length) {
+    const c = stairGroup.children.pop();
+    c.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    if (c.geometry) c.geometry.dispose();
+  }
+
+  // category groups, toggled by the Display checkboxes
+  const gSteps = new THREE.Group();
+  const gLand = new THREE.Group();
+  const gRails = new THREE.Group();
+  const gSlabs = new THREE.Group();
+  const gOut = new THREE.Group();
+
+  let maxX = 10, maxY = 10;
+
+  model.flights.forEach(fl => {
+    const landMat = fl.fits ? MAT.land : MAT.landBad;
+    fl.runs.forEach(r => renderRun(gSteps, r, fl, fl.fits ? MAT.step : MAT.stepBad));
+    fl.landings.forEach(l => {
+      const w = l.x1 - l.x0, d = l.y1 - l.y0;
+      const top = fl.baseElev + l.topRisers * fl.riserH;
+      addBox(gLand, w, 0.45, d, l.x0 + w / 2, top - 0.225, -(l.y0 + d / 2), landMat);
+    });
+    renderRails(gRails, fl);
+    maxX = Math.max(maxX, fl.openW);
+    maxY = Math.max(maxY, fl.openL);
+  });
+
+  // floor slabs with openings at levels 2..N
+  const pad = 7;
+  model.flights.forEach((fl, i) => {
+    const elev = model.levels[i + 1].elevation;
+    const shape = new THREE.Shape();
+    shape.moveTo(-pad, -pad);
+    shape.lineTo(maxX + pad, -pad);
+    shape.lineTo(maxX + pad, maxY + pad);
+    shape.lineTo(-pad, maxY + pad);
+    shape.closePath();
+    const hole = new THREE.Path();
+    hole.moveTo(0, 0);
+    hole.lineTo(0, fl.openL);
+    hole.lineTo(fl.openW, fl.openL);
+    hole.lineTo(fl.openW, 0);
+    hole.closePath();
+    shape.holes.push(hole);
+
+    const geo = new THREE.ShapeGeometry(shape);
+    const mesh = new THREE.Mesh(geo, MAT.slab);
+    mesh.rotation.x = -Math.PI / 2;     // plan (x, y) maps to (x, elev, -y)
+    mesh.position.y = elev;
+    gSlabs.add(mesh);
+
+    // opening outline
+    const pts = [
+      new THREE.Vector3(0, elev, 0), new THREE.Vector3(fl.openW, elev, 0),
+      new THREE.Vector3(fl.openW, elev, -fl.openL), new THREE.Vector3(0, elev, -fl.openL),
+      new THREE.Vector3(0, elev, 0)
+    ];
+    gOut.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), MAT.openEdge));
+  });
+
+  // envelope outline (shaft enclosure) per level, amber: each level shows
+  // only its own rectangle, so a deeper landing on one flight, such as an
+  // area of refuge, moves only the levels that flight touches
+  if (model.envelopes && model.flights.some(fl => fl.floorLandIn > 0)) {
+    model.levels.forEach((lv, j) => {
+      const r = model.envelopes[j];
+      if (!r) return;
+      const e = lv.elevation;
+      const pts = [
+        new THREE.Vector3(r.x0, e, -r.y0), new THREE.Vector3(r.x1, e, -r.y0),
+        new THREE.Vector3(r.x1, e, -r.y1), new THREE.Vector3(r.x0, e, -r.y1),
+        new THREE.Vector3(r.x0, e, -r.y0)
+      ];
+      gOut.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), MAT.envEdge));
+    });
+  }
+
+  [gSteps, gLand, gRails, gSlabs, gOut].forEach(g => stairGroup.add(g));
+  viewGroups = { stairs: gSteps, landings: gLand, rails: gRails, outlines: gOut };
+  applyDisplay();
+
+  return { maxX, maxY, topElev: model.levels[model.levels.length - 1].elevation };
+}
+
+/* View-only visibility. Never touches the model or the export. */
+function applyDisplay() {
+  if (!viewGroups) return;
+  Object.keys(viewGroups).forEach(k => { viewGroups[k].visible = state.display[k]; });
+  if (gridRef) gridRef.visible = state.display.grid;
+}
+
+function fitView(bounds) {
+  const cx = bounds.maxX / 2, cy = bounds.maxY / 2, h = bounds.topElev;
+  const r = Math.max(bounds.maxX, bounds.maxY, h) * 1.9 + 14;
+  orbit.fit(new THREE.Vector3(cx, h / 2, -cy), r);
+}
+
+/* ---------- 5. UI ---------- */
+let lastBounds = null;
+
+function buildCodeUI() {
+  const sel = document.getElementById('codeSel');
+  sel.innerHTML = Object.entries(CODES)
+    .map(([k, c]) => '<option value="' + k + '">' + c.label + '</option>').join('');
+  sel.value = state.code;
+  sel.onchange = () => { state.code = sel.value; refresh(true); };
+}
+
+function codeCardHTML(code) {
+  return 'max riser <b>' + code.maxRiserIn + ' in</b> &nbsp; min tread <b>' + code.minTreadIn + ' in</b><br>' +
+    'min width <b>' + code.minWidthIn + ' in</b> &nbsp; max rise btwn landings <b>' + code.maxRiseFt + ' ft</b><br>' +
+    'handrail <b>' + code.handrailIn[0] + ' to ' + code.handrailIn[1] + ' in</b> &nbsp; guard <b>' + code.guardIn + ' in</b><br>' +
+    'handrail ext: top <b>' + code.extTopIn + ' in</b> level / bottom <b>' + code.extBottomTreads + ' tread sloped + ' + code.extBottomHorizIn + ' in level</b> (1014.6)<br>' +
+    'floor landing depth &ge; <b>min(stair width, 48 in)</b> (1011.6)';
+}
+
+/* Railing cycle button: parenthesized label = inherited from the global
+   defaults; plain label = per flight override. Cycle adds INHERIT. */
+function railBtn(i, key, name, raw, eff) {
+  const inherited = raw === null || raw === undefined;
+  const label = inherited ? '(' + eff.toUpperCase() + ')' : raw.toUpperCase();
+  const title = name === 'LAND'
+    ? 'Landing handrail: FLOOR posted, WALL bar on a back wall, OFF removes it and restores code extensions. Click cycles FLOOR, WALL, OFF, INHERIT.'
+    : 'Click cycles FLOOR, WALL, OFF, INHERIT. Parentheses = inherited from Railing Defaults.';
+  return '<button data-i="' + i + '" data-toggle="' + key + '" class="' + (eff !== 'off' ? 'on' : '') + '" title="' + title + '">' + name + ': ' + label + '</button>';
+}
+
+function flightCardHTML(fl, i) {
+  const f = state.flights[i];
+  const labels = { straight: 'STRAIGHT', L: 'L SHAPE', U: 'U SHAPE' };
+  const shapeSel = '<select data-i="' + i + '" data-k="shape">' +
+    ['straight', 'L', 'U'].map(s =>
+      '<option value="' + s + '"' + (f.shape === s ? ' selected' : '') + '>' +
+      labels[s] + '</option>').join('') + '</select>';
+  return '<div class="flight ' + (f._open ? '' : 'closed ') + (fl.fits && fl.issues.length === 0 ? '' : 'bad') + '">' +
+    '<h3 data-i="' + i + '" data-exp="1"><span class="chev">&#9662;</span>Flight ' + (i + 1) + ' &nbsp;L' + (i + 1) + ' &gt; L' + (i + 2) +
+    (f._open ? '' : '<span class="mini">' + f.shape.toUpperCase() + ' / ' + f.ftf + ' FT</span>') +
+    '<span class="badge ' + (fl.issues.length === 0 ? 'ok' : 'err') + '">' +
+    (fl.issues.length === 0 ? 'OK' : fl.issues.length + ' ISSUE' + (fl.issues.length > 1 ? 'S' : '')) + '</span></h3>' +
+    '<div class="fbody">' +
+    '<div class="row"><label>Floor to floor</label><input type="number" data-i="' + i + '" data-k="ftf" value="' + f.ftf + '" min="3" max="30" step="0.25"><span class="unit">ft</span></div>' +
+    '<div class="row"><label>Opening width (X)</label><input type="number" data-i="' + i + '" data-k="openW" value="' + f.openW + '" min="3" max="60" step="0.5"><span class="unit">ft</span></div>' +
+    '<div class="row"><label>Opening length (Y)</label><input type="number" data-i="' + i + '" data-k="openL" value="' + f.openL + '" min="3" max="60" step="0.5"><span class="unit">ft</span></div>' +
+    '<div class="row"><label>Landing depth</label><input type="number" data-i="' + i + '" data-k="landingIn" value="' + (f.landingIn || Math.round(fl.landingUsedIn * 4) / 4) + '" min="20" max="96" step="1"><span class="unit">in</span></div>' +
+    '<div class="row"><label>Floor landing</label><input type="number" data-i="' + i + '" data-k="floorLandIn" value="' + fl.floorLandIn + '" min="0" max="96" step="1" title="Floor landing strip depth at the entry levels of this flight. Deepen for an area of refuge. 0 disables."><span class="unit">in</span></div>' +
+    '<div class="row"><label>Run gap (U)</label><input type="number" data-i="' + i + '" data-k="gapIn" value="' + f.gapIn + '" min="0" max="120" step="1"><span class="unit">in</span></div>' +
+    '<div class="shapes"><button class="fitbtn" data-i="' + i + '" data-fit="1">FIT OPENING TO STAIR (' + fl.footW.toFixed(2) + ' x ' + fl.footL.toFixed(2) + ' FT)</button></div>' +
+    '<div class="shapes">' + shapeSel +
+    '<button class="rotbtn" data-i="' + i + '" data-rot="1">ROT ' + f.rot + '&deg;</button>' +
+    '<button class="rotbtn' + (f.mirror ? ' on' : '') + '" data-i="' + i + '" data-mirror="1" title="Flip the turn direction at landings">MIR ' + (f.mirror ? 'ON' : 'OFF') + '</button></div>' +
+    '<div class="shapes">' +
+    railBtn(i, 'railL', 'L', f.railL, fl.railL) +
+    railBtn(i, 'railR', 'R', f.railR, fl.railR) +
+    railBtn(i, 'guards', 'G', f.guards, fl.guards) +
+    railBtn(i, 'landRail', 'LAND', f.landRail, fl.landRail) +
+    '<button data-i="' + i + '" data-toggle="offsetTread" class="' + (f.offsetTread ? 'on' : '') + '" title="Stagger the upper run one tread for a clean handrail transition">OFFSET</button>' +
+    '</div>' +
+    '<div class="readout">' +
+    'risers <b>' + fl.N + '</b> @ <b>' + fl.riserIn.toFixed(2) + ' in</b> &nbsp; treads <b>' + state.treadIn + ' in</b><br>' +
+    'footprint <b class="' + (fl.fits ? 'fit-ok' : 'fit-bad') + '">' + fl.footW.toFixed(1) + ' x ' + fl.footL.toFixed(1) + ' ft</b>' +
+    ' / opening <b>' + f.openW.toFixed(1) + ' x ' + f.openL.toFixed(1) + ' ft</b>' +
+    '</div>' +
+    '<div class="issues">' + fl.issues.map(s => '<div>' + s + '</div>').join('') + '</div>' +
+    '</div></div>';
+}
+
+function refresh(rebuildPanel) {
+  const model = compute();
+  lastModel = model;
+  lastBounds = renderModel(model);
+
+  document.getElementById('codeCard').innerHTML = codeCardHTML(model.code);
+  document.getElementById('globalIssues').innerHTML =
+    model.globalIssues.map(s => '<div>' + s + '</div>').join('');
+
+  if (rebuildPanel) {
+    const wrap = document.getElementById('flightCards');
+    wrap.innerHTML = model.flights.map((fl, i) => flightCardHTML(fl, i)).reverse().join('');
+  } else {
+    // light refresh: rebuild cards but preserve focus on the active input
+    const active = document.activeElement;
+    const key = active && active.dataset ? active.dataset.i + ':' + active.dataset.k : null;
+    const pos = active && active.selectionStart;
+    const wrap = document.getElementById('flightCards');
+    wrap.innerHTML = lastModel.flights.map((fl, i) => flightCardHTML(fl, i)).reverse().join('');
+    if (key) {
+      const el = wrap.querySelector('input[data-i="' + key.split(':')[0] + '"][data-k="' + key.split(':')[1] + '"]');
+      if (el) { el.focus(); try { el.selectionStart = el.selectionEnd = pos; } catch (e) {} }
+    }
+  }
+}
+
+let lastModel = null;
+
+function wirePanel() {
+  const gcycle = { floor: 'wall', wall: 'off', off: 'floor' };
+  const wireRailDefault = (id, key, name) => {
+    const el = document.getElementById(id);
+    const paint = () => {
+      el.textContent = name + ': ' + state[key].toUpperCase();
+      el.className = state[key] !== 'off' ? 'on' : '';
+    };
+    paint();
+    el.onclick = () => { state[key] = gcycle[state[key]]; paint(); refresh(true); };
+  };
+  wireRailDefault('gRailL', 'railL', 'L');
+  wireRailDefault('gRailR', 'railR', 'R');
+  wireRailDefault('gGuards', 'guards', 'G');
+  wireRailDefault('gLandRail', 'landRail', 'LAND');
+  document.getElementById('fitAll').onclick = () => {
+    lastModel.flights.forEach((fl, i) => {
+      state.flights[i].openW = Math.ceil(fl.footW * 100) / 100;
+      state.flights[i].openL = Math.ceil(fl.footL * 100) / 100;
+    });
+    refresh(true);
+  };
+
+  document.getElementById('widthIn').value = state.widthIn;
+  document.getElementById('treadIn').value = state.treadIn;
+  document.getElementById('floors').value = state.floors;
+
+  document.getElementById('widthIn').oninput = e => {
+    const v = parseFloat(e.target.value); if (v > 0) { state.widthIn = v; refresh(false); }
+  };
+  document.getElementById('treadIn').oninput = e => {
+    const v = parseFloat(e.target.value); if (v > 0) { state.treadIn = v; refresh(false); }
+  };
+  document.getElementById('floors').oninput = e => {
+    const v = parseInt(e.target.value);
+    if (v >= 2 && v <= 8) { state.floors = v; refresh(true); fitView(lastBounds); }
+  };
+
+  const cards = document.getElementById('flightCards');
+  cards.addEventListener('input', e => {
+    const i = e.target.dataset.i, k = e.target.dataset.k;
+    if (i === undefined || !k) return;
+    if (k === 'shape') {
+      state.flights[i].shape = e.target.value;
+      refresh(true);
+      return;
+    }
+    const v = parseFloat(e.target.value);
+    if (k === 'landingIn') {
+      state.flights[i].landingIn = (!isNaN(v) && v > 0) ? v : null;
+      refresh(false);
+      return;
+    }
+    if (k === 'gapIn') {
+      state.flights[i].gapIn = (!isNaN(v) && v >= 0) ? v : 4;
+      refresh(false);
+      return;
+    }
+    if (k === 'floorLandIn') {
+      state.flights[i].floorLandIn = (!isNaN(v) && v >= 0) ? v : null;
+      refresh(false);
+      return;
+    }
+    if (!isNaN(v) && v > 0) { state.flights[i][k] = v; refresh(false); }
+  });
+  cards.addEventListener('click', e => {
+    const hd = e.target.closest('h3[data-exp]');
+    if (hd) {
+      const i = hd.dataset.i;
+      state.flights[i]._open = !state.flights[i]._open;
+      refresh(true);
+      return;
+    }
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const i = btn.dataset.i;
+    if (btn.dataset.fit) {
+      const fl = lastModel.flights[i];
+      state.flights[i].openW = Math.ceil(fl.footW * 100) / 100;
+      state.flights[i].openL = Math.ceil(fl.footL * 100) / 100;
+      refresh(true);
+      return;
+    }
+    if (btn.dataset.toggle) {
+      const k = btn.dataset.toggle;
+      if (k === 'offsetTread') {
+        state.flights[i].offsetTread = !state.flights[i].offsetTread;
+      } else {
+        // floor -> wall -> off -> inherit (null) -> floor
+        const cur = state.flights[i][k];
+        const cycle = { floor: 'wall', wall: 'off', off: null };
+        state.flights[i][k] = (cur === null || cur === undefined) ? 'floor' : cycle[cur];
+      }
+      refresh(true);
+    }
+    else if (btn.dataset.rot) {
+      state.flights[i].rot = (state.flights[i].rot + 90) % 360;
+      refresh(true);
+    }
+    else if (btn.dataset.mirror) {
+      state.flights[i].mirror = !state.flights[i].mirror;
+      refresh(true);
+    }
+  });
+
+  // section expanders
+  document.querySelectorAll('#panel section h2').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('closed'));
+  });
+
+  // display checkboxes (view only)
+  document.getElementById('displayChecks').addEventListener('change', e => {
+    const k = e.target.dataset.d;
+    if (!k) return;
+    state.display[k] = e.target.checked;
+    applyDisplay();
+  });
+
+  document.getElementById('fitBtn').onclick = () => fitView(lastBounds);
+  document.getElementById('exportBtn').onclick = exportJSON;
+}
+
+/* ---------- 6. JSON export ----------
+   Schema follows the ArchSmarter JSON-to-Revit executor pattern:
+   metadata, named elements, inferred_type keys resolved through
+   type_mappings (revit_type left null for the executor UI), _TODO.
+   The C# executor consumes runs with StairsEditScope +
+   StairsRun.CreateStraightRun and sketches landings from boundaries. */
+function exportJSON() {
+  const m = lastModel;
+  const code = m.code;
+  const stairNames = [];
+  const railNames = { handrail_floor: [], handrail_wall: [], guard_floor: [], guard_wall: [] };
+
+  const stairs = m.flights.map((fl, i) => {
+    const name = 'Stair ' + (i + 1);
+    stairNames.push(name);
+    fl.rails.forEach(r => {
+      const key = (r.category === 'guard' ? 'guard' : 'handrail') +
+        (r.mount === 'wall' ? '_wall' : '_floor');
+      railNames[key].push(name + ' ' + r.name);
+    });
+    return {
+      name: name,
+      base_level: 'Level ' + (i + 1),
+      top_level: 'Level ' + (i + 2),
+      shape: fl.shape,
+      rotation_deg: fl.rot,
+      mirrored: !!fl.mirror,
+      floor_landing: fl.floorLandIn > 0 ? { depth_in: fl.floorLandIn, sides: fl.entrySides } : undefined,
+      run_gap_in: fl.gapIn,
+      tread_offset: !!fl.offsetTread,
+      width: round3(fl.W),
+      riser_count: fl.N,
+      actual_riser_height: round3(fl.riserH),
+      tread_depth: round3(fl.T),
+      runs: fl.runs.map((r, j) => ({
+        name: name + ' ' + r.name,
+        path_start: [round3(r.sx), round3(r.sy)],
+        path_end: [round3(r.ex), round3(r.ey)],
+        riser_count: r.risers,
+        tread_count: r.risers - 1,
+        start_riser_index: r.startIdx,
+        base_elevation: round3(fl.baseElev + r.startIdx * fl.riserH),
+        top_elevation: round3(fl.baseElev + (r.startIdx + r.risers) * fl.riserH)
+      })),
+      landings: fl.landings.map(l => ({
+        name: name + ' ' + l.name,
+        boundary: [
+          [round3(l.x0), round3(l.y0)], [round3(l.x1), round3(l.y0)],
+          [round3(l.x1), round3(l.y1)], [round3(l.x0), round3(l.y1)]
+        ],
+        elevation: round3(fl.baseElev + l.topRisers * fl.riserH)
+      })),
+      landing_depth_in: fl.landingUsedIn,
+      // Rail paths are exported at walking-surface elevation (nosing line
+      // along runs, landing surface on guards). The Revit railing type
+      // supplies the height; height_in is included for reference.
+      railings: fl.rails.map(r => ({
+        name: name + ' ' + r.name,
+        category: r.category,
+        side: r.side,
+        segment: r.segment,
+        mount: r.mount || 'floor',
+        height_in: r.height_in,
+        inferred_type: (r.category === 'guard' ? 'guard_42' : 'handrail_36') +
+          (r.mount === 'wall' ? '_wall' : '_floor'),
+        path_start: [round3(r.a[0]), round3(r.a[1]), round3(r.a[2] - r.height_in / 12)],
+        path_end: [round3(r.b[0]), round3(r.b[1]), round3(r.b[2] - r.height_in / 12)]
+      })),
+      inferred_type: 'monolithic_stair',
+      validation: {
+        compliant: fl.issues.length === 0,
+        issues: fl.issues
+      }
+    };
+  });
+
+  const out = {
+    metadata: {
+      generator: 'StairLab',
+      version: '0.1',
+      units: 'feet',
+      code: state.code,
+      created: new Date().toISOString(),
+      stair_width_in: state.widthIn,
+      tread_depth_in: state.treadIn,
+      floors: state.floors
+    },
+    levels: m.levels,
+    openings: m.flights.map((fl, i) => ({
+      level: 'Level ' + (i + 2),
+      origin: [0, 0],
+      width: fl.openW,
+      length: fl.openL
+    })),
+    envelope: {
+      origin: [round3(m.envelope.x0), round3(m.envelope.y0)],
+      width: round3(m.envelope.x1 - m.envelope.x0),
+      length: round3(m.envelope.y1 - m.envelope.y0)
+    },
+    envelopes: m.envelopes.map((r, j) => ({
+      level: m.levels[j].name,
+      origin: [round3(r.x0), round3(r.y0)],
+      width: round3(r.x1 - r.x0),
+      length: round3(r.y1 - r.y0)
+    })),
+    stairs: stairs,
+    type_mappings: {
+      stair_types: {
+        monolithic_stair: {
+          description: 'Monolithic stair, width ' + state.widthIn + ' in, tread ' + state.treadIn + ' in',
+          characteristics: { width_in: state.widthIn, tread_in: state.treadIn },
+          revit_type: null,
+          used_by: stairNames
+        }
+      },
+      railing_types: {
+        handrail_36_floor: {
+          description: 'Floor mounted handrail on posts at 36 in above nosing, with IBC 1014.6 extensions at non-continuous ends',
+          characteristics: { height_in: 36, category: 'handrail', mount: 'floor', ext_top_in: 12, ext_bottom_treads: 1 },
+          revit_type: null,
+          used_by: railNames.handrail_floor
+        },
+        handrail_36_wall: {
+          description: 'Wall mounted (bracket) handrail at 36 in above nosing, with IBC 1014.6 extensions at non-continuous ends',
+          characteristics: { height_in: 36, category: 'handrail', mount: 'wall', ext_top_in: 12, ext_bottom_treads: 1 },
+          revit_type: null,
+          used_by: railNames.handrail_wall
+        },
+        guard_42_floor: {
+          description: 'Floor mounted guard on posts at 42 in along free landing edges',
+          characteristics: { height_in: 42, category: 'guard', mount: 'floor' },
+          revit_type: null,
+          used_by: railNames.guard_floor
+        },
+        guard_42_wall: {
+          description: 'Wall mounted (bracket) guard rail at 42 in along free landing edges',
+          characteristics: { height_in: 42, category: 'guard', mount: 'wall' },
+          revit_type: null,
+          used_by: railNames.guard_wall
+        }
+      }
+    },
+    _TODO: [
+      'Headroom clearance check (80 in) against opening edges',
+      'Inter-flight rail continuity requires adjacent runs (within one stair width); rotated-apart flights keep code extensions',
+      'Balusters and rail profile geometry',
+      'Wall geometry for wall mounted rails (mount is exported as data only)',
+      'Opening offsets per floor (openings currently align at origin)',
+      'Entry door locations on the envelope walls (entry sides are exported as data only)',
+      'Area of refuge requirements beyond floor area: wheelchair space counts (30 x 48 in per IBC 1009.3) and two way communication',
+      'Multiple intermediate landings on U and L legs',
+      'Winder, curved, and spiral stair shapes (spiral planned as a separate tool)',
+      'Stringer type mappings'
+    ],
+    // raw designer state for reloading this file with Load Design.
+    // The Revit executor scripts ignore this block
+    designer: {
+      version: 1,
+      state: {
+        code: state.code,
+        widthIn: state.widthIn, treadIn: state.treadIn, floors: state.floors,
+        railL: state.railL, railR: state.railR, guards: state.guards, landRail: state.landRail,
+        flights: state.flights.map(f => {
+          const c = Object.assign({}, f);
+          delete c._open;
+          return c;
+        })
+      }
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'stair-design.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* Restore the designer from an exported StairLab JSON. Files carrying a
+   designer block round trip exactly, including which railing values are
+   inherited from the defaults. Older files reconstruct from the executor
+   data; their railing values become per flight overrides. */
+function loadDesign(text) {
+  const d = JSON.parse(text);
+  if (!d || !d.metadata || d.metadata.generator !== 'StairLab') {
+    throw new Error('Not a StairLab export.');
+  }
+
+  if (d.designer && d.designer.state) {
+    const s = d.designer.state;
+    ['code', 'widthIn', 'treadIn', 'floors', 'railL', 'railR', 'guards', 'landRail'].forEach(k => {
+      if (s[k] !== undefined) state[k] = s[k];
+    });
+    state.flights = (s.flights || []).map(f => Object.assign(defaultFlight(), f));
+  } else {
+    // reconstruction from executor data
+    if (d.metadata.stair_width_in) state.widthIn = d.metadata.stair_width_in;
+    if (d.metadata.tread_depth_in) state.treadIn = d.metadata.tread_depth_in;
+    if (d.metadata.code && CODES[d.metadata.code]) state.code = d.metadata.code;
+    const stairs = d.stairs || [];
+    const levels = d.levels || [];
+    state.floors = d.metadata.floors || levels.length || (stairs.length + 1);
+    state.flights = stairs.map((st, i) => {
+      const f = defaultFlight();
+      if (levels[i] && levels[i + 1]) f.ftf = levels[i + 1].elevation - levels[i].elevation;
+      if (st.shape) f.shape = st.shape;
+      f.rot = st.rotation_deg || 0;
+      f.mirror = !!st.mirrored;
+      if (st.run_gap_in !== undefined) f.gapIn = st.run_gap_in;
+      if (st.landing_depth_in !== undefined) f.landingIn = st.landing_depth_in;
+      f.floorLandIn = st.floor_landing ? st.floor_landing.depth_in : 0;
+      f.offsetTread = !!st.tread_offset;
+      const op = (d.openings || [])[i];
+      if (op) { f.openW = op.width; f.openL = op.length; }
+      // railing settings from the exported segments; values become
+      // per flight overrides since inheritance is not in old files
+      const segs = st.railings || [];
+      const mountOf = (seg, side) => {
+        const r = segs.find(g => g.segment === seg && (!side || g.side === side));
+        return r ? r.mount : 'off';
+      };
+      f.railL = mountOf('run', 'left');
+      f.railR = mountOf('run', 'right');
+      f.guards = mountOf('landing_edge', null);
+      const conn = segs.find(g => g.segment === 'landing_connector');
+      f.landRail = conn ? conn.mount : null; // null = inherit when indeterminate
+      return f;
+    });
+  }
+
+  ensureFlights();
+  wirePanel();
+  refresh(true);
+}
+
+function wireLoad() {
+  const fileInput = document.getElementById('loadFile');
+  document.getElementById('loadBtn').onclick = () => { fileInput.value = ''; fileInput.click(); };
+  fileInput.onchange = () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        loadDesign(reader.result);
+      } catch (err) {
+        alert('Could not load the design: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+}
+
+/* ---------- 7. boot ---------- */
+ensureFlights();
+buildCodeUI();
+initThree();
+wirePanel();
+wireLoad();
+refresh(true);
+fitView(lastBounds);
+</script>
+</body>
+</html>
