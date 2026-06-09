@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revit Family JSON Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1014;
+    --surface: #161a20;
+    --surface-2: #1c2128;
+    --border: #272d36;
+    --border-2: #333a45;
+    --text: #e6e8ec;
+    --text-dim: #8a919c;
+    --text-faint: #5a6270;
+    --accent: #6ea8d8;
+    --accent-dim: #3d5a75;
+    --void: #d97757;
+    --solid: #b8c3d0;
+    --warn: #d4a056;
+    --ok: #7fb069;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: 100vh;
+  }
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 8px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--surface); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+
+  .brand {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand-title {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .brand-subtitle {
+    color: var(--text-faint);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .file-actions {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .btn:hover {
+    background: var(--border-2);
+    border-color: var(--accent-dim);
+  }
+
+  .btn-primary {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .btn-primary:hover { background: var(--accent); color: var(--bg); }
+
+  .section {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--surface);
+  }
+
+  .section-header:hover { background: var(--surface-2); }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .section-count {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 6px;
+    background: var(--surface-2);
+    border-radius: 2px;
+  }
+
+  .section-chevron {
+    color: var(--text-faint);
+    font-size: 10px;
+    transition: transform 0.2s;
+  }
+
+  .section.collapsed .section-chevron { transform: rotate(-90deg); }
+  .section.collapsed .section-body { display: none; }
+
+  .section-body {
+    padding: 4px 20px 16px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--border);
+  }
+
+  .meta-row:last-child { border-bottom: none; }
+
+  .meta-label {
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .meta-value {
+    font-size: 12px;
+    color: var(--text);
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .param-row {
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dotted var(--border);
+  }
+
+  .param-row:last-child { border-bottom: none; }
+
+  .param-name {
+    font-size: 12px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .param-name-tag {
+    display: block;
+    font-size: 9px;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 1px;
+  }
+
+  .param-input {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 2px;
+    text-align: right;
+    width: 100%;
+  }
+
+  .param-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .param-input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    justify-self: end;
+    padding: 0;
+  }
+
+  .element-row {
+    display: grid;
+    grid-template-columns: 16px 14px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  .element-checkbox {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .element-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--solid);
+  }
+
+  .element-dot.void {
+    background: var(--void);
+    border: 1px dashed var(--bg);
+  }
+
+  .element-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .element-name:hover { color: var(--accent); }
+  .element-row.selected .element-name { color: var(--accent); font-weight: 500; }
+
+  .element-tag {
+    font-size: 9px;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 1px 5px;
+    background: var(--surface-2);
+    border-radius: 2px;
+  }
+
+  .refplane-row {
+    display: grid;
+    grid-template-columns: 16px 14px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+  }
+
+  .axis-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .axis-dot.x { background: #d66565; }
+  .axis-dot.y { background: #7fb069; }
+  .axis-dot.z { background: #6ea8d8; }
+
+  .refplane-offset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+  }
+
+  .toggle-label {
+    font-size: 12px;
+  }
+
+  /* Canvas area */
+  .canvas-wrap {
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  #canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hud {
+    position: absolute;
+    pointer-events: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .hud-tl { top: 16px; left: 20px; }
+  .hud-tr { top: 16px; right: 20px; text-align: right; }
+  .hud-bl { bottom: 16px; left: 20px; }
+  .hud-br { bottom: 16px; right: 20px; text-align: right; }
+
+  .hud-label {
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+
+  .hud-value {
+    color: var(--text);
+    margin-left: 6px;
+  }
+
+  .view-controls {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    display: flex;
+    gap: 4px;
+    pointer-events: auto;
+  }
+
+  .view-btn {
+    background: rgba(22, 26, 32, 0.9);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .view-btn:hover { color: var(--text); border-color: var(--accent-dim); }
+  .view-btn.active { color: var(--accent); border-color: var(--accent); }
+
+  .error-banner {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    right: 20px;
+    background: rgba(208, 119, 87, 0.12);
+    border: 1px solid var(--void);
+    color: var(--void);
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    border-radius: 3px;
+    display: none;
+  }
+
+  .error-banner.show { display: block; }
+
+  .drop-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(14, 16, 20, 0.85);
+    border: 2px dashed var(--accent);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--accent);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .drop-overlay.show { display: flex; }
+
+  input[type="file"] { display: none; }
+
+  .empty-state {
+    padding: 10px 0;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-title">Revit Family Viewer</div>
+      <div class="brand-subtitle">JSON Validation Tool</div>
+    </div>
+
+    <div class="file-actions">
+      <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Load JSON</button>
+      <button class="btn" onclick="loadExample()">Example</button>
+      <input type="file" id="fileInput" accept=".json,application/json">
+    </div>
+
+    <div class="section" id="section-meta">
+      <div class="section-header" onclick="toggleSection('section-meta')">
+        <span class="section-title">Metadata</span>
+        <span class="section-chevron">▾</span>
+      </div>
+      <div class="section-body" id="metaBody">
+        <div class="empty-state">No file loaded</div>
+      </div>
+    </div>
+
+    <div class="section" id="section-params">
+      <div class="section-header" onclick="toggleSection('section-params')">
+        <span class="section-title">Parameters</span>
+        <span class="section-count" id="paramCount">0</span>
+      </div>
+      <div class="section-body" id="paramBody">
+        <div class="empty-state">No parameters</div>
+      </div>
+    </div>
+
+    <div class="section collapsed" id="section-planes">
+      <div class="section-header" onclick="toggleSection('section-planes')">
+        <span class="section-title">Reference Planes</span>
+        <span class="section-count" id="planeCount">0</span>
+      </div>
+      <div class="section-body" id="planeBody">
+        <div class="empty-state">No planes</div>
+      </div>
+    </div>
+
+    <div class="section" id="section-geom">
+      <div class="section-header" onclick="toggleSection('section-geom')">
+        <span class="section-title">Geometry</span>
+        <span class="section-count" id="geomCount">0</span>
+      </div>
+      <div class="section-body" id="geomBody">
+        <div class="empty-state">No geometry</div>
+      </div>
+    </div>
+
+    <div class="section" id="section-display">
+      <div class="section-header" onclick="toggleSection('section-display')">
+        <span class="section-title">Display</span>
+        <span class="section-chevron">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="toggle-row">
+          <span class="toggle-label">Show Solids</span>
+          <input type="checkbox" class="param-input" id="toggleSolids" checked>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Voids</span>
+          <input type="checkbox" class="param-input" id="toggleVoids" checked>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Reference Planes</span>
+          <input type="checkbox" class="param-input" id="togglePlanes">
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Wireframe</span>
+          <input type="checkbox" class="param-input" id="toggleWire">
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Grid</span>
+          <input type="checkbox" class="param-input" id="toggleGrid" checked>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Axes</span>
+          <input type="checkbox" class="param-input" id="toggleAxes" checked>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+
+    <div class="view-controls">
+      <button class="view-btn" onclick="setView('iso')">ISO</button>
+      <button class="view-btn" onclick="setView('front')">Front</button>
+      <button class="view-btn" onclick="setView('top')">Top</button>
+      <button class="view-btn" onclick="setView('side')">Side</button>
+      <button class="view-btn" onclick="fitView()">Fit</button>
+    </div>
+
+    <div class="hud hud-bl">
+      <div><span class="hud-label">Units</span><span class="hud-value" id="hudUnits">n/a</span></div>
+      <div><span class="hud-label">Elements</span><span class="hud-value" id="hudElements">0</span></div>
+      <div><span class="hud-label">Camera</span><span class="hud-value" id="hudCamera">iso</span></div>
+    </div>
+
+    <div class="hud hud-br">
+      <div><span class="hud-label">Drag</span><span class="hud-value">orbit</span></div>
+      <div><span class="hud-label">Shift+Drag</span><span class="hud-value">pan</span></div>
+      <div><span class="hud-label">Scroll</span><span class="hud-value">zoom</span></div>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div class="drop-overlay" id="dropOverlay">Drop JSON file to load</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================================
+   Expression Evaluator
+   Tokenize -> Shunting-yard RPN -> Evaluate
+   ========================================================================= */
+
+class ExpressionEvaluator {
+  constructor(paramMap) {
+    this.params = paramMap; // {Underscored_Name: numericValue}
+  }
+
+  evaluate(expr) {
+    if (typeof expr === 'number') return expr;
+    if (expr === null || expr === undefined) throw new Error('Null expression');
+    if (typeof expr !== 'string') throw new Error('Invalid expression type: ' + typeof expr);
+    const trimmed = expr.trim();
+    if (trimmed === '') throw new Error('Empty expression');
+    const tokens = this.tokenize(trimmed);
+    const rpn = this.toRPN(tokens);
+    return this.evaluateRPN(rpn);
+  }
+
+  tokenize(expr) {
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+      const c = expr[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (/[0-9.]/.test(c)) {
+        let n = '';
+        while (i < expr.length && /[0-9.]/.test(expr[i])) { n += expr[i]; i++; }
+        const val = parseFloat(n);
+        if (Number.isNaN(val)) throw new Error('Invalid number: ' + n);
+        tokens.push({ kind: 'num', value: val });
+      } else if (/[a-zA-Z_]/.test(c)) {
+        let s = '';
+        while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) { s += expr[i]; i++; }
+        tokens.push({ kind: 'id', value: s });
+      } else if ('+-*/()'.indexOf(c) >= 0) {
+        tokens.push({ kind: 'op', value: c });
+        i++;
+      } else {
+        throw new Error('Unexpected character: ' + c);
+      }
+    }
+    return tokens;
+  }
+
+  toRPN(tokens) {
+    const output = [];
+    const stack = [];
+    const prec = { '+': 1, '-': 1, '*': 2, '/': 2, 'u-': 3, 'u+': 3 };
+    const rightAssoc = { 'u-': true, 'u+': true };
+
+    let prev = null;
+    for (const tok of tokens) {
+      if (tok.kind === 'num' || tok.kind === 'id') {
+        output.push(tok);
+      } else if (tok.kind === 'op') {
+        if (tok.value === '(') {
+          stack.push(tok);
+        } else if (tok.value === ')') {
+          while (stack.length && stack[stack.length - 1].value !== '(') {
+            output.push(stack.pop());
+          }
+          if (!stack.length) throw new Error('Mismatched parentheses');
+          stack.pop();
+        } else {
+          let opKey = tok.value;
+          const isUnaryContext = !prev || (prev.kind === 'op' && prev.value !== ')');
+          if ((opKey === '-' || opKey === '+') && isUnaryContext) {
+            opKey = 'u' + opKey;
+          }
+          while (stack.length) {
+            const top = stack[stack.length - 1];
+            if (top.value === '(') break;
+            const topKey = top.opKey || top.value;
+            if (prec[topKey] > prec[opKey] ||
+                (prec[topKey] === prec[opKey] && !rightAssoc[opKey])) {
+              output.push(stack.pop());
+            } else {
+              break;
+            }
+          }
+          stack.push({ kind: 'op', value: tok.value, opKey: opKey });
+        }
+      }
+      prev = tok;
+    }
+
+    while (stack.length) {
+      const top = stack.pop();
+      if (top.value === '(' || top.value === ')') throw new Error('Mismatched parentheses');
+      output.push(top);
+    }
+    return output;
+  }
+
+  evaluateRPN(rpn) {
+    const stack = [];
+    for (const tok of rpn) {
+      if (tok.kind === 'num') {
+        stack.push(tok.value);
+      } else if (tok.kind === 'id') {
+        if (!(tok.value in this.params)) {
+          throw new Error('Unknown parameter: ' + tok.value);
+        }
+        stack.push(this.params[tok.value]);
+      } else if (tok.kind === 'op') {
+        const key = tok.opKey || tok.value;
+        if (key === 'u-') { stack.push(-stack.pop()); }
+        else if (key === 'u+') { /* no-op */ }
+        else {
+          const b = stack.pop();
+          const a = stack.pop();
+          if (a === undefined || b === undefined) throw new Error('Malformed expression');
+          switch (key) {
+            case '+': stack.push(a + b); break;
+            case '-': stack.push(a - b); break;
+            case '*': stack.push(a * b); break;
+            case '/':
+              if (b === 0) throw new Error('Division by zero');
+              stack.push(a / b);
+              break;
+            default: throw new Error('Unknown operator: ' + key);
+          }
+        }
+      }
+    }
+    if (stack.length !== 1) throw new Error('Malformed expression');
+    return stack[0];
+  }
+}
+
+/* =========================================================================
+   Revit Family Renderer
+   Builds Three.js meshes from a parsed family JSON
+   ========================================================================= */
+
+class FamilyRenderer {
+  constructor(scene) {
+    this.scene = scene;
+    this.family = null;
+    this.paramValues = {};   // {Name: numericValue}
+    this.paramMap = {};      // {Underscored_Name: numericValue}
+    this.group = new THREE.Group();
+    this.planeGroup = new THREE.Group();
+    this.elementMeshes = {}; // {elementName: mesh}
+    this.elementVisibility = {}; // {elementName: bool}
+    this.showSolids = true;
+    this.showVoids = true;
+    this.showPlanes = false;
+    this.showWire = false;
+    this.selectedName = null;
+    this.scene.add(this.group);
+    this.scene.add(this.planeGroup);
+  }
+
+  loadFamily(family) {
+    this.family = family;
+    this.paramValues = {};
+    this.elementVisibility = {};
+    for (const p of family.parameters || []) {
+      // Only numeric parameters participate in geometry
+      if (p.type === 'length' || p.type === 'number' || p.type === 'angle' || p.type === 'integer') {
+        this.paramValues[p.name] = Number(p.default_value);
+      }
+    }
+    for (const g of family.geometry || []) {
+      this.elementVisibility[g.name] = true;
+    }
+    this.rebuild();
+  }
+
+  updateParam(name, value) {
+    this.paramValues[name] = Number(value);
+    this.rebuild();
+  }
+
+  setElementVisible(name, visible) {
+    this.elementVisibility[name] = visible;
+    const mesh = this.elementMeshes[name];
+    if (mesh) this._applyVisibility(mesh, name);
+  }
+
+  setDisplay({ showSolids, showVoids, showPlanes, showWire }) {
+    if (showSolids !== undefined) this.showSolids = showSolids;
+    if (showVoids !== undefined) this.showVoids = showVoids;
+    if (showPlanes !== undefined) this.showPlanes = showPlanes;
+    if (showWire !== undefined) this.showWire = showWire;
+    for (const name in this.elementMeshes) {
+      this._applyVisibility(this.elementMeshes[name], name);
+    }
+    this.planeGroup.visible = this.showPlanes;
+    this.group.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        obj.material.wireframe = this.showWire;
+      }
+    });
+  }
+
+  _applyVisibility(mesh, name) {
+    const g = (this.family.geometry || []).find(x => x.name === name);
+    if (!g) return;
+    const userVis = this.elementVisibility[name];
+    const typeVis = g.is_void ? this.showVoids : this.showSolids;
+    mesh.visible = userVis && typeVis;
+  }
+
+  select(name) {
+    if (this.selectedName && this.elementMeshes[this.selectedName]) {
+      const prev = this.elementMeshes[this.selectedName];
+      prev.material.emissive = new THREE.Color(0x000000);
+    }
+    this.selectedName = name;
+    if (name && this.elementMeshes[name]) {
+      this.elementMeshes[name].material.emissive = new THREE.Color(0x2a3b52);
+    }
+  }
+
+  rebuild() {
+    // Clear existing meshes
+    while (this.group.children.length > 0) {
+      const obj = this.group.children[0];
+      this.group.remove(obj);
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+    }
+    while (this.planeGroup.children.length > 0) {
+      const obj = this.planeGroup.children[0];
+      this.planeGroup.remove(obj);
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+    }
+    this.elementMeshes = {};
+
+    if (!this.family) return;
+
+    // Build the underscored parameter map for the expression evaluator
+    this.paramMap = {};
+    for (const [name, value] of Object.entries(this.paramValues)) {
+      this.paramMap[name.replace(/\s+/g, '_')] = value;
+    }
+    const evaluator = new ExpressionEvaluator(this.paramMap);
+
+    // Resolve reference planes
+    const planes = {};
+    for (const p of this.family.reference_planes || []) {
+      planes[p.name] = {
+        direction: p.direction,
+        offset: evaluator.evaluate(p.offset),
+        name: p.name
+      };
+    }
+
+    // Build geometry
+    let bbox = new THREE.Box3();
+    bbox.makeEmpty();
+
+    for (const geom of this.family.geometry || []) {
+      const plane = planes[geom.sketch_plane];
+      if (!plane) {
+        console.warn('Missing sketch plane: ' + geom.sketch_plane);
+        continue;
+      }
+      try {
+        const mesh = this._buildGeometry(geom, plane, evaluator);
+        if (mesh) {
+          this.group.add(mesh);
+          this.elementMeshes[geom.name] = mesh;
+          this._applyVisibility(mesh, geom.name);
+          mesh.geometry.computeBoundingBox();
+          const b = mesh.geometry.boundingBox.clone();
+          b.applyMatrix4(mesh.matrixWorld);
+          bbox.union(b);
+        }
+      } catch (err) {
+        console.error('Error building ' + geom.name + ':', err);
+        showError('Error in "' + geom.name + '": ' + err.message);
+      }
+    }
+
+    // Build reference planes visualization
+    this._buildReferencePlanes(planes, bbox);
+
+    // Re-apply wireframe and visibility flags
+    this.group.traverse(obj => {
+      if (obj.isMesh && obj.material) obj.material.wireframe = this.showWire;
+    });
+    this.planeGroup.visible = this.showPlanes;
+
+    this.boundingBox = bbox;
+  }
+
+  _buildGeometry(geom, plane, evaluator) {
+    if (geom.type === 'extrusion') {
+      return this._buildExtrusion(geom, plane, evaluator);
+    }
+    if (geom.type === 'sweep') {
+      return this._buildSweep(geom, plane, evaluator);
+    }
+    if (geom.type === 'blend') {
+      return this._buildBlend(geom, plane, evaluator);
+    }
+    throw new Error('Unsupported geometry type: ' + geom.type);
+  }
+
+  _buildShape(profile, evaluator) {
+    const E = (v) => evaluator.evaluate(v);
+    const shape = new THREE.Shape();
+
+    if (profile.shape === 'rectangle') {
+      const ox = E(profile.origin.u);
+      const oy = E(profile.origin.v);
+      const w = E(profile.width);
+      const h = E(profile.height);
+      shape.moveTo(ox, oy);
+      shape.lineTo(ox + w, oy);
+      shape.lineTo(ox + w, oy + h);
+      shape.lineTo(ox, oy + h);
+      shape.lineTo(ox, oy);
+    } else if (profile.shape === 'circle') {
+      const cx = E(profile.center.u);
+      const cy = E(profile.center.v);
+      const r = E(profile.radius);
+      shape.moveTo(cx + r, cy);
+      shape.absarc(cx, cy, r, 0, Math.PI * 2, false);
+    } else if (profile.shape === 'l_shape') {
+      const ox = E(profile.origin.u);
+      const oy = E(profile.origin.v);
+      const W = E(profile.overall_width);
+      const H = E(profile.overall_height);
+      const HT = E(profile.horizontal_leg_thickness);
+      const VT = E(profile.vertical_leg_thickness);
+      shape.moveTo(ox, oy);
+      shape.lineTo(ox + W, oy);
+      shape.lineTo(ox + W, oy + HT);
+      shape.lineTo(ox + VT, oy + HT);
+      shape.lineTo(ox + VT, oy + H);
+      shape.lineTo(ox, oy + H);
+      shape.lineTo(ox, oy);
+    } else if (profile.shape === 'custom') {
+      const verts = profile.vertices.map(p => ({ u: E(p.u), v: E(p.v) }));
+      if (verts.length < 3) throw new Error('Custom profile needs at least 3 vertices');
+      shape.moveTo(verts[0].u, verts[0].v);
+      for (let i = 1; i < verts.length; i++) {
+        shape.lineTo(verts[i].u, verts[i].v);
+      }
+      shape.lineTo(verts[0].u, verts[0].v);
+    } else {
+      throw new Error('Unsupported profile shape: ' + profile.shape);
+    }
+    return shape;
+  }
+
+  _buildExtrusion(geom, plane, evaluator) {
+    const shape = this._buildShape(geom.profile, evaluator);
+    const startZ = evaluator.evaluate(geom.extrusion_start);
+    const endZ = evaluator.evaluate(geom.extrusion_end);
+    const depth = endZ - startZ;
+    if (Math.abs(depth) < 1e-6) throw new Error('Zero-length extrusion');
+
+    // ExtrudeGeometry extrudes along +Z in local space.
+    // We handle negative depth by extruding positive and translating local Z origin.
+    const absDepth = Math.abs(depth);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: absDepth,
+      bevelEnabled: false,
+      curveSegments: 32
+    });
+
+    const mesh = this._createMesh(geo, geom);
+
+    // Local z origin shift:
+    // If depth is positive, local z=0 is at startZ along plane normal.
+    // If depth is negative, local z=0 is at startZ, extrusion goes -Z direction.
+    // We want local z=0 to land at plane offset + startZ along plane normal.
+    const localZOffset = depth > 0 ? 0 : -absDepth;
+    geo.translate(0, 0, localZOffset);
+    // Now local geometry spans Z from min(startZ, endZ) to max(startZ, endZ) relative to plane.
+    // But we applied translate to shift from [0,absDepth] to [localZOffset, localZOffset+absDepth].
+    // Actually cleaner: translate so geometry spans [startZ, endZ] offset from mesh origin at plane.
+    // Current state after translate: geometry Z in [localZOffset, localZOffset+absDepth]
+    //   depth>0: [0, depth] = [startZ shifted]. We need it at [startZ, endZ].
+    //            So additional shift by startZ.
+    //   depth<0: [-absDepth, 0] = [-|d|, 0]. We need it at [endZ, startZ] = [startZ+depth, startZ].
+    //            So additional shift by startZ.
+    geo.translate(0, 0, startZ);
+
+    // Position and orient on sketch plane
+    this._applyPlaneTransform(mesh, plane);
+    return mesh;
+  }
+
+  _buildSweep(geom, plane, evaluator) {
+    // Simplified sweep: interpret path as a 2D polyline on the sketch plane,
+    // sweep the profile along it.
+    const segments = geom.path.segments || [];
+    if (!segments.length) throw new Error('Sweep has no path segments');
+
+    // Build 3D points for the path in local sketch-plane coords (Z=0)
+    const pts = [];
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (seg.segment_type === 'line') {
+        if (i === 0) pts.push(new THREE.Vector3(
+          evaluator.evaluate(seg.start.u),
+          evaluator.evaluate(seg.start.v),
+          0
+        ));
+        pts.push(new THREE.Vector3(
+          evaluator.evaluate(seg.end.u),
+          evaluator.evaluate(seg.end.v),
+          0
+        ));
+      } else if (seg.segment_type === 'arc') {
+        const cx = evaluator.evaluate(seg.center.u);
+        const cy = evaluator.evaluate(seg.center.v);
+        const sx = evaluator.evaluate(seg.start.u);
+        const sy = evaluator.evaluate(seg.start.v);
+        const ex = evaluator.evaluate(seg.end.u);
+        const ey = evaluator.evaluate(seg.end.v);
+        const r = Math.hypot(sx - cx, sy - cy);
+        const startAng = Math.atan2(sy - cy, sx - cx);
+        const endAng = Math.atan2(ey - cy, ex - cx);
+        const STEPS = 24;
+        if (i === 0) pts.push(new THREE.Vector3(sx, sy, 0));
+        let d = endAng - startAng;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        for (let s = 1; s <= STEPS; s++) {
+          const a = startAng + d * (s / STEPS);
+          pts.push(new THREE.Vector3(cx + r * Math.cos(a), cy + r * Math.sin(a), 0));
+        }
+      }
+    }
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+
+    const shape = this._buildShape(geom.profile, evaluator);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      steps: Math.max(24, pts.length * 4),
+      bevelEnabled: false,
+      extrudePath: curve
+    });
+    const mesh = this._createMesh(geo, geom);
+    this._applyPlaneTransform(mesh, plane);
+    return mesh;
+  }
+
+  _buildBlend(geom, plane, evaluator) {
+    // Build two sets of vertices and stitch them into a lofted mesh.
+    const bottomPts = this._profileToPolyline(geom.bottom_profile, evaluator);
+    const topPts = this._profileToPolyline(geom.top_profile, evaluator);
+
+    // Resample so both profiles have the same number of points.
+    const n = Math.max(bottomPts.length, topPts.length, 16);
+    const bottom = resamplePolyline(bottomPts, n);
+    const top = resamplePolyline(topPts, n);
+
+    const bOff = evaluator.evaluate(geom.bottom_offset);
+    const tOff = evaluator.evaluate(geom.top_offset);
+
+    const positions = [];
+    const indices = [];
+
+    // Side wall vertices
+    for (let i = 0; i < n; i++) {
+      positions.push(bottom[i].x, bottom[i].y, bOff);
+    }
+    for (let i = 0; i < n; i++) {
+      positions.push(top[i].x, top[i].y, tOff);
+    }
+
+    // Side wall triangles
+    for (let i = 0; i < n; i++) {
+      const a = i;
+      const b = (i + 1) % n;
+      const c = n + ((i + 1) % n);
+      const d = n + i;
+      indices.push(a, b, c);
+      indices.push(a, c, d);
+    }
+
+    // Cap triangulation using triangle fan from centroid
+    const bCentroid = centroid2D(bottom);
+    const tCentroid = centroid2D(top);
+    const bCenterIdx = positions.length / 3;
+    positions.push(bCentroid.x, bCentroid.y, bOff);
+    const tCenterIdx = positions.length / 3;
+    positions.push(tCentroid.x, tCentroid.y, tOff);
+
+    for (let i = 0; i < n; i++) {
+      const a = i;
+      const b = (i + 1) % n;
+      // Bottom cap (flipped winding)
+      indices.push(bCenterIdx, b, a);
+      // Top cap
+      indices.push(tCenterIdx, n + a, n + b);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mesh = this._createMesh(geo, geom);
+    this._applyPlaneTransform(mesh, plane);
+    return mesh;
+  }
+
+  _profileToPolyline(profile, evaluator) {
+    const E = (v) => evaluator.evaluate(v);
+    if (profile.shape === 'rectangle') {
+      const ox = E(profile.origin.u), oy = E(profile.origin.v);
+      const w = E(profile.width), h = E(profile.height);
+      return [
+        { x: ox, y: oy },
+        { x: ox + w, y: oy },
+        { x: ox + w, y: oy + h },
+        { x: ox, y: oy + h }
+      ];
+    }
+    if (profile.shape === 'circle') {
+      const cx = E(profile.center.u), cy = E(profile.center.v), r = E(profile.radius);
+      const pts = [];
+      const N = 32;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+      }
+      return pts;
+    }
+    if (profile.shape === 'custom') {
+      return profile.vertices.map(p => ({ x: E(p.u), y: E(p.v) }));
+    }
+    if (profile.shape === 'l_shape') {
+      const ox = E(profile.origin.u), oy = E(profile.origin.v);
+      const W = E(profile.overall_width), H = E(profile.overall_height);
+      const HT = E(profile.horizontal_leg_thickness), VT = E(profile.vertical_leg_thickness);
+      return [
+        { x: ox, y: oy },
+        { x: ox + W, y: oy },
+        { x: ox + W, y: oy + HT },
+        { x: ox + VT, y: oy + HT },
+        { x: ox + VT, y: oy + H },
+        { x: ox, y: oy + H }
+      ];
+    }
+    throw new Error('Unsupported profile shape for blend: ' + profile.shape);
+  }
+
+  _createMesh(geo, geom) {
+    const isVoid = geom.is_void;
+    const color = isVoid ? 0xd97757 : 0xb8c3d0;
+    const material = new THREE.MeshStandardMaterial({
+      color: color,
+      transparent: isVoid,
+      opacity: isVoid ? 0.35 : 1.0,
+      roughness: 0.55,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+      wireframe: this.showWire,
+      flatShading: false
+    });
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.name = geom.name;
+    mesh.userData = { isVoid: isVoid, elementName: geom.name };
+
+    // Add edge lines for definition
+    const edges = new THREE.EdgesGeometry(geo, 30);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: isVoid ? 0x8a4a35 : 0x5c6775,
+      transparent: isVoid,
+      opacity: isVoid ? 0.6 : 1.0
+    });
+    const lineSeg = new THREE.LineSegments(edges, edgeMat);
+    mesh.add(lineSeg);
+
+    return mesh;
+  }
+
+  _applyPlaneTransform(mesh, plane) {
+    // Orient the mesh so its local Z axis aligns with the sketch plane normal,
+    // and its local X, Y axes map to the sketch u, v directions.
+    // Then translate to the plane offset along the normal.
+    if (plane.direction === 'x') {
+      // local X -> world Y, local Y -> world Z, local Z -> world X
+      mesh.matrixAutoUpdate = false;
+      const m = new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(1, 0, 0)
+      );
+      m.setPosition(plane.offset, 0, 0);
+      mesh.matrix.copy(m);
+      mesh.matrixWorldNeedsUpdate = true;
+    } else if (plane.direction === 'y') {
+      mesh.matrixAutoUpdate = false;
+      const m = new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0, 1, 0)
+      );
+      m.setPosition(0, plane.offset, 0);
+      mesh.matrix.copy(m);
+      mesh.matrixWorldNeedsUpdate = true;
+    } else if (plane.direction === 'z') {
+      mesh.matrixAutoUpdate = false;
+      const m = new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, 0, 1)
+      );
+      m.setPosition(0, 0, plane.offset);
+      mesh.matrix.copy(m);
+      mesh.matrixWorldNeedsUpdate = true;
+    }
+    mesh.updateMatrixWorld(true);
+  }
+
+  _buildReferencePlanes(planes, bbox) {
+    if (bbox.isEmpty()) return;
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const margin = Math.max(size.x, size.y, size.z) * 0.15;
+    const sz = new THREE.Vector3(
+      size.x + margin * 2,
+      size.y + margin * 2,
+      size.z + margin * 2
+    );
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+
+    const axisColor = { x: 0xd66565, y: 0x7fb069, z: 0x6ea8d8 };
+
+    for (const name in planes) {
+      const p = planes[name];
+      const color = axisColor[p.direction];
+      const planeGeo = new THREE.PlaneGeometry(1, 1);
+      const mat = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.06,
+        side: THREE.DoubleSide
+      });
+      const planeMesh = new THREE.Mesh(planeGeo, mat);
+
+      if (p.direction === 'x') {
+        planeMesh.scale.set(1, sz.y, sz.z);
+        planeMesh.rotation.y = Math.PI / 2;
+        planeMesh.position.set(p.offset, center.y, center.z);
+      } else if (p.direction === 'y') {
+        planeMesh.scale.set(sz.x, 1, sz.z);
+        planeMesh.rotation.x = Math.PI / 2;
+        planeMesh.position.set(center.x, p.offset, center.z);
+      } else {
+        planeMesh.scale.set(sz.x, sz.y, 1);
+        planeMesh.position.set(center.x, center.y, p.offset);
+      }
+
+      // Add outline
+      const edges = new THREE.EdgesGeometry(planeMesh.geometry);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.5
+      }));
+      planeMesh.add(line);
+      this.planeGroup.add(planeMesh);
+    }
+  }
+}
+
+function resamplePolyline(pts, n) {
+  // Compute cumulative arc length, then sample n evenly-spaced points
+  const distances = [0];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    distances.push(total);
+  }
+  const closing = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y);
+  total += closing;
+  distances.push(total);
+  const closed = [...pts, pts[0]];
+
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const target = (total * i) / n;
+    // Find segment
+    let j = 0;
+    while (j < distances.length - 1 && distances[j + 1] < target) j++;
+    const segLen = distances[j + 1] - distances[j];
+    const t = segLen < 1e-9 ? 0 : (target - distances[j]) / segLen;
+    const x = closed[j].x + (closed[j + 1].x - closed[j].x) * t;
+    const y = closed[j].y + (closed[j + 1].y - closed[j].y) * t;
+    out.push({ x, y });
+  }
+  return out;
+}
+
+function centroid2D(pts) {
+  let sx = 0, sy = 0;
+  for (const p of pts) { sx += p.x; sy += p.y; }
+  return { x: sx / pts.length, y: sy / pts.length };
+}
+
+/* =========================================================================
+   Scene setup and controls
+   ========================================================================= */
+
+const canvas = document.getElementById('canvas');
+const canvasWrap = document.getElementById('canvasWrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1014);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100000);
+camera.position.set(60, -80, 50);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas,
+  antialias: true
+});
+renderer.setPixelRatio(window.devicePixelRatio);
+
+// Lighting
+const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+scene.add(ambient);
+const key = new THREE.DirectionalLight(0xffffff, 0.7);
+key.position.set(30, -40, 80);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xa8c4e0, 0.25);
+fill.position.set(-40, 30, -20);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.15);
+rim.position.set(0, 60, -40);
+scene.add(rim);
+
+// Grid helper (XY plane in three.js, we use Z up)
+let gridHelper = new THREE.GridHelper(200, 40, 0x2a2e34, 0x1c2128);
+gridHelper.rotation.x = Math.PI / 2;
+scene.add(gridHelper);
+
+// Axes helper
+const axesHelper = new THREE.AxesHelper(15);
+scene.add(axesHelper);
+
+// Orient camera for Z-up world
+camera.up.set(0, 0, 1);
+
+const renderer_group = new FamilyRenderer(scene);
+
+// Simple orbit/pan/zoom controls
+const target = new THREE.Vector3(0, 0, 0);
+let sphericalRadius = 0;
+let sphericalTheta = 0; // azimuth
+let sphericalPhi = 0;   // polar angle from +Z axis
+
+function updateSphericalFromCamera() {
+  const offset = new THREE.Vector3().subVectors(camera.position, target);
+  sphericalRadius = offset.length();
+  sphericalTheta = Math.atan2(offset.y, offset.x);
+  sphericalPhi = Math.acos(Math.max(-1, Math.min(1, offset.z / sphericalRadius)));
+}
+
+function updateCameraFromSpherical() {
+  const sinPhi = Math.sin(sphericalPhi);
+  const x = sphericalRadius * sinPhi * Math.cos(sphericalTheta);
+  const y = sphericalRadius * sinPhi * Math.sin(sphericalTheta);
+  const z = sphericalRadius * Math.cos(sphericalPhi);
+  camera.position.set(target.x + x, target.y + y, target.z + z);
+  camera.lookAt(target);
+}
+
+updateSphericalFromCamera();
+
+let isDragging = false;
+let dragButton = 0;
+let shiftHeld = false;
+let lastX = 0, lastY = 0;
+
+canvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragButton = e.button;
+  shiftHeld = e.shiftKey;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+
+  const panning = shiftHeld || dragButton === 2 || dragButton === 1;
+  if (panning) {
+    // Pan in the camera's local axes
+    const distance = sphericalRadius;
+    const panScale = distance * 0.0015;
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    camera.getWorldDirection(new THREE.Vector3());
+    right.setFromMatrixColumn(camera.matrix, 0);
+    up.setFromMatrixColumn(camera.matrix, 1);
+    right.multiplyScalar(-dx * panScale);
+    up.multiplyScalar(dy * panScale);
+    target.add(right);
+    target.add(up);
+    updateCameraFromSpherical();
+  } else {
+    // Orbit
+    sphericalTheta -= dx * 0.008;
+    sphericalPhi -= dy * 0.008;
+    sphericalPhi = Math.max(0.05, Math.min(Math.PI - 0.05, sphericalPhi));
+    updateCameraFromSpherical();
+  }
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY > 0 ? 1.1 : 1 / 1.1;
+  sphericalRadius *= zoomFactor;
+  sphericalRadius = Math.max(1, sphericalRadius);
+  updateCameraFromSpherical();
+}, { passive: false });
+
+function resize() {
+  const w = canvasWrap.clientWidth;
+  const h = canvasWrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+/* =========================================================================
+   View presets and framing
+   ========================================================================= */
+
+function fitView() {
+  if (!renderer_group.boundingBox || renderer_group.boundingBox.isEmpty()) return;
+  const bbox = renderer_group.boundingBox;
+  const center = new THREE.Vector3();
+  bbox.getCenter(center);
+  const size = new THREE.Vector3();
+  bbox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * Math.PI / 180;
+  const distance = (maxDim / 2) / Math.tan(fov / 2) * 2.4;
+  target.copy(center);
+  sphericalRadius = distance;
+  updateCameraFromSpherical();
+  updateGrid();
+}
+
+function setView(preset) {
+  if (!renderer_group.boundingBox || renderer_group.boundingBox.isEmpty()) {
+    target.set(0, 0, 0);
+    sphericalRadius = 100;
+  } else {
+    const center = new THREE.Vector3();
+    renderer_group.boundingBox.getCenter(center);
+    target.copy(center);
+    const size = new THREE.Vector3();
+    renderer_group.boundingBox.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * Math.PI / 180;
+    sphericalRadius = (maxDim / 2) / Math.tan(fov / 2) * 2.4;
+  }
+
+  if (preset === 'iso') { sphericalTheta = -Math.PI / 4; sphericalPhi = Math.PI / 3; }
+  else if (preset === 'front') { sphericalTheta = -Math.PI / 2; sphericalPhi = Math.PI / 2; }
+  else if (preset === 'top') { sphericalTheta = 0; sphericalPhi = 0.01; }
+  else if (preset === 'side') { sphericalTheta = 0; sphericalPhi = Math.PI / 2; }
+
+  updateCameraFromSpherical();
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.view-btn')].find(b => b.textContent.toLowerCase() === preset);
+  if (btn) btn.classList.add('active');
+  document.getElementById('hudCamera').textContent = preset;
+}
+
+function updateGrid() {
+  if (!renderer_group.boundingBox || renderer_group.boundingBox.isEmpty()) return;
+  const size = new THREE.Vector3();
+  renderer_group.boundingBox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const gridSize = Math.ceil(maxDim * 3);
+  const oldVisible = gridHelper.visible;
+  scene.remove(gridHelper);
+  gridHelper.geometry.dispose();
+  gridHelper.material.dispose();
+  gridHelper = new THREE.GridHelper(gridSize, 40, 0x2a2e34, 0x1c2128);
+  gridHelper.rotation.x = Math.PI / 2;
+  gridHelper.visible = oldVisible;
+  scene.add(gridHelper);
+}
+
+/* =========================================================================
+   UI rendering
+   ========================================================================= */
+
+let currentFamily = null;
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(showError._t);
+  showError._t = setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+function clearError() {
+  document.getElementById('errorBanner').classList.remove('show');
+}
+
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+function renderMeta(family) {
+  const body = document.getElementById('metaBody');
+  if (!family || !family.metadata) {
+    body.innerHTML = '<div class="empty-state">No metadata</div>';
+    return;
+  }
+  const m = family.metadata;
+  const rows = [
+    ['Category', m.category || 'n/a'],
+    ['Schema', m.schema_version || 'n/a'],
+    ['Units', family.units || 'n/a'],
+    ['Description', m.description || 'n/a']
+  ];
+  if (m.prompt) rows.push(['Prompt', m.prompt]);
+  body.innerHTML = rows.map(([k, v]) => `
+    <div class="meta-row">
+      <div class="meta-label">${escapeHtml(k)}</div>
+      <div class="meta-value">${escapeHtml(String(v))}</div>
+    </div>
+  `).join('');
+}
+
+function renderParams(family) {
+  const body = document.getElementById('paramBody');
+  const count = document.getElementById('paramCount');
+  const params = (family.parameters || []);
+  count.textContent = params.length;
+
+  if (!params.length) {
+    body.innerHTML = '<div class="empty-state">No parameters</div>';
+    return;
+  }
+
+  body.innerHTML = params.map((p, idx) => {
+    const tag = p.name.replace(/\s+/g, '_');
+    const isNumeric = p.type === 'length' || p.type === 'number' || p.type === 'angle' || p.type === 'integer';
+    const isBool = p.type === 'yes_no';
+    let input = '';
+    if (isNumeric) {
+      input = `<input type="number" class="param-input" step="any" value="${p.default_value}" data-param="${escapeAttr(p.name)}">`;
+    } else if (isBool) {
+      input = `<input type="checkbox" class="param-input" ${p.default_value ? 'checked' : ''} data-param="${escapeAttr(p.name)}" disabled>`;
+    } else {
+      input = `<input type="text" class="param-input" value="${escapeAttr(String(p.default_value))}" disabled>`;
+    }
+    return `
+      <div class="param-row">
+        <div>
+          <div class="param-name" title="${escapeAttr(p.name)}">${escapeHtml(p.name)}</div>
+          <div class="param-name-tag">${escapeHtml(tag)}</div>
+        </div>
+        ${input}
+      </div>
+    `;
+  }).join('');
+
+  body.querySelectorAll('.param-input[data-param]').forEach(el => {
+    if (el.type === 'number') {
+      el.addEventListener('input', (e) => {
+        const name = e.target.dataset.param;
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val)) {
+          clearError();
+          try {
+            renderer_group.updateParam(name, val);
+            updateGrid();
+          } catch (err) {
+            showError(err.message);
+          }
+        }
+      });
+    }
+  });
+}
+
+function renderPlanes(family) {
+  const body = document.getElementById('planeBody');
+  const count = document.getElementById('planeCount');
+  const planes = family.reference_planes || [];
+  count.textContent = planes.length;
+
+  if (!planes.length) {
+    body.innerHTML = '<div class="empty-state">No planes</div>';
+    return;
+  }
+  body.innerHTML = planes.map(p => `
+    <div class="refplane-row">
+      <span></span>
+      <span class="axis-dot ${p.direction}"></span>
+      <span>${escapeHtml(p.name)}</span>
+      <span class="refplane-offset">${escapeHtml(String(p.offset))}</span>
+    </div>
+  `).join('');
+}
+
+function renderGeometry(family) {
+  const body = document.getElementById('geomBody');
+  const count = document.getElementById('geomCount');
+  const geom = family.geometry || [];
+  count.textContent = geom.length;
+
+  if (!geom.length) {
+    body.innerHTML = '<div class="empty-state">No geometry</div>';
+    return;
+  }
+
+  body.innerHTML = geom.map((g, idx) => `
+    <div class="element-row" data-element="${escapeAttr(g.name)}">
+      <input type="checkbox" class="element-checkbox" checked data-element="${escapeAttr(g.name)}">
+      <span class="element-dot ${g.is_void ? 'void' : ''}"></span>
+      <span class="element-name">${escapeHtml(g.name)}</span>
+      <span class="element-tag">${escapeHtml(g.type)}</span>
+    </div>
+  `).join('');
+
+  body.querySelectorAll('.element-checkbox').forEach(el => {
+    el.addEventListener('change', (e) => {
+      const name = e.target.dataset.element;
+      renderer_group.setElementVisible(name, e.target.checked);
+    });
+  });
+
+  body.querySelectorAll('.element-name').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const row = e.target.closest('.element-row');
+      const name = row.dataset.element;
+      body.querySelectorAll('.element-row').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      renderer_group.select(name);
+    });
+  });
+}
+
+function renderHUD(family) {
+  document.getElementById('hudUnits').textContent = family.units || 'n/a';
+  document.getElementById('hudElements').textContent = (family.geometry || []).length;
+}
+
+function loadFamilyData(family) {
+  if (!family || !family.geometry) {
+    showError('Invalid family JSON: missing geometry array');
+    return;
+  }
+  clearError();
+  currentFamily = family;
+  try {
+    renderer_group.loadFamily(family);
+    renderMeta(family);
+    renderParams(family);
+    renderPlanes(family);
+    renderGeometry(family);
+    renderHUD(family);
+    fitView();
+    setView('iso');
+    updateGrid();
+  } catch (err) {
+    showError('Failed to load: ' + err.message);
+    console.error(err);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function escapeAttr(s) { return escapeHtml(s); }
+
+/* =========================================================================
+   File loading
+   ========================================================================= */
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      loadFamilyData(data);
+    } catch (err) {
+      showError('JSON parse error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+// Drag and drop
+const dropOverlay = document.getElementById('dropOverlay');
+let dragCounter = 0;
+canvasWrap.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragCounter++;
+  dropOverlay.classList.add('show');
+});
+canvasWrap.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter <= 0) { dropOverlay.classList.remove('show'); dragCounter = 0; }
+});
+canvasWrap.addEventListener('dragover', (e) => e.preventDefault());
+canvasWrap.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropOverlay.classList.remove('show');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      loadFamilyData(data);
+    } catch (err) {
+      showError('JSON parse error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+// Display toggles
+document.getElementById('toggleSolids').addEventListener('change', (e) => {
+  renderer_group.setDisplay({ showSolids: e.target.checked });
+});
+document.getElementById('toggleVoids').addEventListener('change', (e) => {
+  renderer_group.setDisplay({ showVoids: e.target.checked });
+});
+document.getElementById('togglePlanes').addEventListener('change', (e) => {
+  renderer_group.setDisplay({ showPlanes: e.target.checked });
+});
+document.getElementById('toggleWire').addEventListener('change', (e) => {
+  renderer_group.setDisplay({ showWire: e.target.checked });
+});
+document.getElementById('toggleGrid').addEventListener('change', (e) => {
+  gridHelper.visible = e.target.checked;
+});
+document.getElementById('toggleAxes').addEventListener('change', (e) => {
+  axesHelper.visible = e.target.checked;
+});
+
+/* =========================================================================
+   Example family (embedded base cabinet)
+   ========================================================================= */
+
+const EXAMPLE_FAMILY = {
+  "metadata": {
+    "description": "Base cabinet with one drawer on top and a single door below. Includes side panels, bottom shelf, back panel, and toe kick cutout.",
+    "schema_version": "0.1",
+    "category": "Casework",
+    "prompt": "Create a base cabinet, 24 inches wide, 36 inches tall, 24 inches deep, with one drawer on top and a single door below"
+  },
+  "units": "inches",
+  "subcategories": ["Carcass", "Doors", "Drawers"],
+  "reference_planes": [
+    { "name": "Left", "direction": "x", "offset": "-Width / 2" },
+    { "name": "Right", "direction": "x", "offset": "Width / 2" },
+    { "name": "Front", "direction": "y", "offset": 0 },
+    { "name": "Back", "direction": "y", "offset": "Depth" },
+    { "name": "Top", "direction": "z", "offset": "Height" },
+    { "name": "Bottom", "direction": "z", "offset": 0 },
+    { "name": "Toe Kick Top", "direction": "z", "offset": "Toe_Kick_Height" },
+    { "name": "Drawer Bottom", "direction": "z", "offset": "Height - Drawer_Height" }
+  ],
+  "parameters": [
+    { "name": "Width", "type": "length", "instance_or_type": "instance", "default_value": 24, "group": "Dimensions" },
+    { "name": "Height", "type": "length", "instance_or_type": "instance", "default_value": 36, "group": "Dimensions" },
+    { "name": "Depth", "type": "length", "instance_or_type": "instance", "default_value": 24, "group": "Dimensions" },
+    { "name": "Material Thickness", "type": "length", "instance_or_type": "type", "default_value": 0.75, "group": "Construction" },
+    { "name": "Drawer Height", "type": "length", "instance_or_type": "instance", "default_value": 6, "group": "Dimensions" },
+    { "name": "Toe Kick Height", "type": "length", "instance_or_type": "type", "default_value": 4, "group": "Dimensions" },
+    { "name": "Toe Kick Setback", "type": "length", "instance_or_type": "type", "default_value": 3, "group": "Dimensions" },
+    { "name": "Door Gap", "type": "length", "instance_or_type": "type", "default_value": 0.0625, "group": "Construction" }
+  ],
+  "geometry": [
+    { "name": "Left Side Panel", "subcategory": "Carcass", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Left",
+      "profile": { "shape": "rectangle", "origin": { "u": 0, "v": "Toe_Kick_Height" }, "width": "Depth", "height": "Height - Toe_Kick_Height" },
+      "extrusion_start": 0, "extrusion_end": "Material_Thickness" },
+    { "name": "Right Side Panel", "subcategory": "Carcass", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Right",
+      "profile": { "shape": "rectangle", "origin": { "u": 0, "v": "Toe_Kick_Height" }, "width": "Depth", "height": "Height - Toe_Kick_Height" },
+      "extrusion_start": "-Material_Thickness", "extrusion_end": 0 },
+    { "name": "Bottom Shelf", "subcategory": "Carcass", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Toe Kick Top",
+      "profile": { "shape": "rectangle", "origin": { "u": "-Width / 2 + Material_Thickness", "v": 0 }, "width": "Width - 2 * Material_Thickness", "height": "Depth" },
+      "extrusion_start": 0, "extrusion_end": "Material_Thickness" },
+    { "name": "Back Panel", "subcategory": "Carcass", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Back",
+      "profile": { "shape": "rectangle", "origin": { "u": "-Width / 2 + Material_Thickness", "v": "Toe_Kick_Height + Material_Thickness" }, "width": "Width - 2 * Material_Thickness", "height": "Height - Toe_Kick_Height - Material_Thickness" },
+      "extrusion_start": "-Material_Thickness", "extrusion_end": 0 },
+    { "name": "Drawer Front", "subcategory": "Drawers", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Front",
+      "profile": { "shape": "rectangle", "origin": { "u": "-Width / 2 + Door_Gap", "v": "Height - Drawer_Height + Door_Gap" }, "width": "Width - 2 * Door_Gap", "height": "Drawer_Height - 2 * Door_Gap" },
+      "extrusion_start": "-Material_Thickness", "extrusion_end": 0 },
+    { "name": "Door", "subcategory": "Doors", "type": "extrusion", "is_void": false,
+      "sketch_plane": "Front",
+      "profile": { "shape": "rectangle", "origin": { "u": "-Width / 2 + Door_Gap", "v": "Toe_Kick_Height + Door_Gap" }, "width": "Width - 2 * Door_Gap", "height": "Height - Drawer_Height - Toe_Kick_Height - 2 * Door_Gap" },
+      "extrusion_start": "-Material_Thickness", "extrusion_end": 0 },
+    { "name": "Toe Kick Void", "subcategory": "Carcass", "type": "extrusion", "is_void": true,
+      "sketch_plane": "Front",
+      "profile": { "shape": "rectangle", "origin": { "u": "-Width / 2 + Toe_Kick_Setback", "v": 0 }, "width": "Width - 2 * Toe_Kick_Setback", "height": "Toe_Kick_Height" },
+      "extrusion_start": 0, "extrusion_end": "Depth - Toe_Kick_Setback" }
+  ]
+};
+
+function loadExample() {
+  loadFamilyData(EXAMPLE_FAMILY);
+}
+
+// Load example on first open
+loadExample();
+
+</script>
+</body>
+</html>
